@@ -10,6 +10,22 @@ do meio (0.**3**.0).
 
 ## [Não lançado]
 
+### Adicionado
+
+- **Andares por gerência.** Nova variável `HABBLAUD_FLOORS`, com as pastas-gerência separadas por vírgula, por exemplo
+  `HABBLAUD_FLOORS=/home/me/coding/codeStage,/home/me/coding/praxis.`. Cada pasta listada vira um andar, com seletor
+  próprio no escritório. Cada pasta filha direta da gerência é uma sala: uma sessão aberta em subpasta cai na mesma sala.
+  Salas fora de gerência ficam no térreo. Sem a variável, nada muda.
+- Limite conhecido: no timelapse os andares aparecem em ordem alfabética. Se o andar escolhido não existir num instante
+  do replay, a vista cai no primeiro andar e não volta sozinha.
+
+### Alterado
+
+- **Aviso de compatibilidade:** ligar `HABBLAUD_FLOORS` muda o id e o caminho das salas dentro das gerências. Apelidos de
+  sala salvos antes deixam de valer, e o timelapse do dia mistura ids antigos e novos.
+- A lista lateral ordena por andar e mostra o nome do andar em cada sala. A ordem manual vale dentro do andar.
+- O pacote do Habblaud World não muda: nenhum andar local sobe para o World.
+
 ## [1.0.3] - 2026-10-16
 
 ### Corrigido

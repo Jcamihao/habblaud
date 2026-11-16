@@ -42,6 +42,7 @@ aucun identifiant et ne fait aucun appel externe.
 ## Sommaire
 
 - [À quoi ça ressemble](#à-quoi-ça-ressemble)
+- [Étages par direction](#étages-par-direction)
 - [Installation](#installation)
 - [Mode d'emploi](#mode-demploi)
 - [Comptes et utilisation (5 heures et semaine)](#comptes-et-utilisation-5-heures-et-semaine)
@@ -126,6 +127,30 @@ l'immeuble ne garde pas de trous et rétrécit tout seul.
 </table>
 
 > Les images ci-dessus utilisent le **mode démonstration** (projets, personnes et comptes fictifs).
+
+## Étages par direction
+
+Si vous organisez les projets dans des dossiers de direction (ex. : `coding/codeStage` et `coding/praxis.`), le bureau
+peut afficher chaque direction comme un **étage**, avec un sélecteur pour changer d'étage.
+
+**Comment l'activer.** Listez les dossiers de direction dans `HABBLAUD_FLOORS`, séparés par des virgules, avec des
+chemins absolus :
+
+```
+HABBLAUD_FLOORS=/home/me/coding/codeStage,/home/me/coding/praxis.
+```
+
+**Comment les salles se répartissent sur les étages.**
+
+- Chaque dossier enfant direct de la direction est une salle. Une session ouverte dans un sous-dossier (ex. :
+  `codeStage/Triluga/client`) tombe dans la salle `codeStage/Triluga`.
+- Les salles hors de toute direction (ex. : `coding` lui-même) restent au **rez-de-chaussée**.
+- Sans la variable, rien ne change : le bureau fonctionne comme avant, sans sélecteur d'étage.
+
+**Attention.** L'activer change l'id et le chemin des salles à l'intérieur des directions : les surnoms de salle
+enregistrés avant cessent de s'appliquer, et la chronologie du timelapse du jour mélange les anciens et les nouveaux ids.
+
+**Avec Docker**, la valeur va dans le `.env`, avec les chemins de l'hôte. Relancez `npm run docker:up` pour l'appliquer.
 
 ## Installation
 
@@ -753,6 +778,7 @@ Tout fonctionne sans rien configurer. Si vous avez besoin d'ajuster quelque chos
 | `HABBLAUD_HOST` | `127.0.0.1` | Interface du serveur en mode Node. En dehors de `127.0.0.1`/`localhost`, le terminal (ainsi que la réponse et l'envoi de messages depuis le bureau) est désactivé. |
 | `HABBLAUD_BIND` | `127.0.0.1` | Docker uniquement (dans le `.env`) : où le port est publié. `0.0.0.0` ouvre l'accès au réseau local (et désactive le terminal et tout ce qui agit sur les sessions). |
 | `HABBLAUD_CLAUDE_DIRS` | détection automatique | Dossiers des comptes, séparés par des virgules (ex. : `/caminho/conta1,/caminho/conta2`). |
+| `HABBLAUD_FLOORS` | désactivé | Dossiers de direction, séparés par des virgules ; chacun devient un étage du bureau (ex. : `/home/me/coding/codeStage,/home/me/coding/praxis.`). Voir [Étages par direction](#étages-par-direction). |
 | `HABBLAUD_DATA_DIR` | `~/.habblaud` | Où Habblaud garde ses propres données (noms des personnages et des salles, chronologie du timelapse et statistiques de Ma journée). |
 | `HABBLAUD_TIMELINE` | activé | `0` désactive l'enregistrement de la chronologie (les jours déjà enregistrés restent dans le timelapse). Dans Docker, il est toujours activé. |
 | `HABBLAUD_USAGE_DIR` | `~/.habblaud/usage` | Où le mod (ou la dérivation de statusline) enregistre l'utilisation. |

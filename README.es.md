@@ -41,6 +41,7 @@ llamadas externas.
 ## Índice
 
 - [Cómo se ve](#cómo-se-ve)
+- [Pisos por gerencia](#pisos-por-gerencia)
 - [Instalación](#instalación)
 - [Cómo usar](#cómo-usar)
 - [Cuentas y uso (5 horas y semanal)](#cuentas-y-uso-5-horas-y-semanal)
@@ -124,6 +125,29 @@ solo.
 </table>
 
 > Las imágenes de arriba usan el **modo demostración** (proyectos, personas y cuentas ficticios).
+
+## Pisos por gerencia
+
+Si organizas los proyectos en carpetas de gerencia (p. ej., `coding/codeStage` y `coding/praxis.`), la oficina puede
+mostrar cada gerencia como un **piso**, con un selector para cambiar de piso.
+
+**Cómo activarlo.** Lista las carpetas de gerencia en `HABBLAUD_FLOORS`, separadas por comas, con rutas absolutas:
+
+```
+HABBLAUD_FLOORS=/home/me/coding/codeStage,/home/me/coding/praxis.
+```
+
+**Cómo caen las salas en los pisos.**
+
+- Cada carpeta hija directa de la gerencia es una sala. Una sesión abierta en una subcarpeta (p. ej.,
+  `codeStage/Triluga/client`) cae en la sala `codeStage/Triluga`.
+- Las salas fuera de cualquier gerencia (p. ej., la propia `coding`) quedan en la **planta baja**.
+- Sin la variable, nada cambia: la oficina funciona como antes, sin selector de piso.
+
+**Atención.** Activarla cambia el id y la ruta de las salas dentro de las gerencias: los apodos de sala guardados antes
+dejan de valer, y la línea de tiempo del timelapse del día mezcla ids antiguos y nuevos.
+
+**En Docker**, el valor va en el `.env`, con las rutas del host. Ejecuta `npm run docker:up` de nuevo para aplicarlo.
 
 ## Instalación
 
@@ -750,6 +774,7 @@ Todo funciona sin configurar nada. Si necesitas ajustar algo, usa variables de e
 | `HABBLAUD_HOST` | `127.0.0.1` | Interfaz del servidor en modo Node. Fuera de `127.0.0.1`/`localhost`, la terminal (y responder y enviar mensajes desde la oficina) queda desactivada. |
 | `HABBLAUD_BIND` | `127.0.0.1` | Solo Docker (en el `.env`): dónde se publica el puerto. `0.0.0.0` abre la red local (y desactiva la terminal y lo que actúa sobre las sesiones). |
 | `HABBLAUD_CLAUDE_DIRS` | detección automática | Carpetas de las cuentas, separadas por comas (p. ej., `/caminho/conta1,/caminho/conta2`). |
+| `HABBLAUD_FLOORS` | desactivado | Carpetas de gerencia, separadas por comas; cada una se convierte en un piso de la oficina (p. ej., `/home/me/coding/codeStage,/home/me/coding/praxis.`). Ver [Pisos por gerencia](#pisos-por-gerencia). |
 | `HABBLAUD_DATA_DIR` | `~/.habblaud` | Dónde guarda Habblaud sus propios datos (nombres de los personajes y de las salas, línea de tiempo del timelapse y estadísticas de Mi día). |
 | `HABBLAUD_TIMELINE` | activada | `0` desactiva la grabación de la línea de tiempo (los días ya grabados siguen en el timelapse). En Docker siempre está activada. |
 | `HABBLAUD_USAGE_DIR` | `~/.habblaud/usage` | Dónde guarda el uso el mod (o el tap de statusline). |
