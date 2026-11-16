@@ -276,6 +276,11 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       else sim.applySnapshot(shown, Date.now());
       // seguir um agente que ficou em outro andar: solta a câmera
       if (changed && camera.follow && !sim.person(camera.follow)) camera.follow = null;
+      // o prédio do andar novo tem outro tamanho: limites e zoom mínimo antes de enquadrar (antes do 1º quadro, o laço enquadra)
+      if (changed && framed) {
+        updateBounds();
+        overview(true);
+      }
     } catch (err) {
       console.error('[mundo] snapshot inválido ignorado', err);
     }
@@ -416,6 +421,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     floor = f;
     rebuild();
     onSnapshot();
+    // o prédio do andar novo tem outro tamanho: limites e zoom mínimo antes de enquadrar
+    updateBounds();
     overview(true);
     floorCbs.forEach((cb) => cb(floor));
   };
