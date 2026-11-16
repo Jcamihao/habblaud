@@ -1708,6 +1708,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Falha no relógio do escritório: {0}": "Error en el reloj de la oficina: {0}",
   "Erro ao responder {0} {1}: {2}": "Error al responder {0} {1}: {2}",
   "A porta {0} já está em uso (defina HABBLAUD_PORT para usar outra).": "El puerto {0} ya está en uso (define HABBLAUD_PORT para usar otro).",
+  "HABBLAUD_FLOORS: entrada ignorada ({0}).": "HABBLAUD_FLOORS: entrada ignorada ({0}).",
   "Erro no servidor HTTP: {0}": "Error en el servidor HTTP: {0}",
   "🏢 Habblaud {0}{1}{2} em http://{3}:{4}": "🏢 Habblaud {0}{1}{2} en http://{3}:{4}",
   "Nenhuma pasta do Claude Code encontrada (defina HABBLAUD_CLAUDE_DIRS).": "No se encontró ninguna carpeta de Claude Code (define HABBLAUD_CLAUDE_DIRS).",

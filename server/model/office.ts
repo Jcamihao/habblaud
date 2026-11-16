@@ -30,7 +30,8 @@ import { describeGitHubEvent, githubEventKey, RoomEffects, type GitHubEvent } fr
 import { hash32 } from '../../shared/hash';
 import { applyPermission } from '../permissions/registry';
 import type { NameStore, StoredCharacter } from './names';
-import { normalizeCwd, roomDisplayNames, SlotAllocator } from './rooms';
+import { roomDisplayNames } from './rooms';
+import { FloorSlots, floorInfos, floorOf, roomKey } from './floors';
 import { tr } from '../../shared/i18n';
 import type { WorldMeta } from '../../shared/world/api';
 
@@ -56,6 +57,11 @@ export interface OfficeDeps {
   names: NameStore;
   /** Nome escolhido pelo usuário para a sala da pasta (model/room-aliases.ts), se houver. */
   roomAlias?: (path: string) => string | undefined;
+  /**
+   * Gerências (HABBLAUD_FLOORS, ServerConfig.floors): cada uma é um andar; as salas dentro dela são as pastas de
+   * projeto. Vazio ou ausente = sem andares (ids e snapshot iguais aos de antes).
+   */
+  floors?: readonly string[];
   version: string;
   /** Build do cliente servido (ver OfficeSnapshot.meta.build); ausente no modo dev e nos testes. */
   build?: () => string | undefined;
@@ -197,7 +203,7 @@ const byStart = (a: ShellJob, b: ShellJob) => a.startedAt - b.startedAt || a.id.
 export class Office {
   private agents = new Map<string, AgentRecord>();
   private rooms = new Map<string, { path: string; createdAt: number }>();
-  private slots = new SlotAllocator(SLOT_COOLDOWN_MS);
+  private slots = new FloorSlots(SLOT_COOLDOWN_MS);
   private roomNames = new Map<string, string>();
   private feed: FeedItem[] = [];
   private pendingFeed: FeedItem[] = [];
@@ -322,7 +328,7 @@ export class Office {
       this.setStatus(p.id, p.status, p.waitingFor);
       return;
     }
-    const roomId = normalizeCwd(p.cwd);
+    const roomId = roomKey(p.cwd, this.deps.floors ?? []);
     this.ensureRoom(roomId, now);
     const chosen = this.roomCharacter(roomId, p.id, p.sessionId);
     // A mesma sessão retomada noutro processo (ex.: "Assumir aqui") mantém o nome, mesmo com o processo antigo
@@ -955,17 +961,29 @@ export class Office {
     const now = this.now();
     const entries = new Map(this.rooms);
     for (const r of this.demoSnap?.rooms ?? []) entries.set(r.id, { path: r.path, createdAt: r.createdAt });
-    this.slots.sync(entries.keys(), now);
+    // Andar só das salas reais: a sala do demo não tem andar.
+    const floors = this.deps.floors ?? [];
+    const floorOfRoom = new Map<string, string | undefined>();
+    for (const [id, r] of entries) floorOfRoom.set(id, this.rooms.has(id) ? floorOf(r.path, floors) : undefined);
+    this.slots.sync(floorOfRoom, now);
+    const alive = new Set<string>();
+    for (const f of floorOfRoom.values()) if (f !== undefined) alive.add(f);
+    // Térreo (sem andar) primeiro, depois os andares na ordem de HABBLAUD_FLOORS; dentro de cada um, pela vaga.
+    const floorRank = (floor: string | undefined) => (floor === undefined ? -1 : floors.indexOf(floor));
     const rooms: RoomInfo[] = [...entries]
-      .map(([id, r]) => ({
-        id,
-        name: this.roomName(id),
-        path: r.path,
-        slot: this.slots.slotOf(id) ?? 0,
-        seed: hash32(id),
-        createdAt: r.createdAt,
-      }))
-      .sort((a, b) => a.slot - b.slot);
+      .map(([id, r]) => {
+        const floor = floorOfRoom.get(id);
+        return {
+          id,
+          name: this.roomName(id),
+          path: r.path,
+          slot: this.slots.slotOf(id) ?? 0,
+          seed: hash32(id),
+          createdAt: r.createdAt,
+          ...(floor !== undefined ? { floor } : {}),
+        };
+      })
+      .sort((a, b) => floorRank(a.floor) - floorRank(b.floor) || a.slot - b.slot);
     // festa/alarme (eventos do GitHub): das salas reais ou do demo
     for (const room of rooms) {
       const effect = this.effects.get(room.id, now) ?? this.demoSnap?.rooms.find((r) => r.id === room.id)?.effect;
@@ -990,6 +1008,7 @@ export class Office {
       rev: this.rev,
       serverTime: now,
       rooms,
+      ...(floors.length ? { floors: floorInfos(floors, alive) } : {}),
       agents: [...real, ...demoAgents].map(trim),
       accounts: [...this.deps.accounts(sessions), ...(this.demoSnap?.accounts ?? [])],
       ...(ptys ? { ptys: ptys.list } : {}),

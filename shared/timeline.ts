@@ -72,6 +72,8 @@ export interface TimelineRoom {
   slot: number;
   seed: number;
   createdAt: number;
+  /** Andar (RoomInfo.floor). Ausente em quadros antigos e na sala sem andar. */
+  floor?: string;
   demo?: true;
 }
 
@@ -210,6 +212,7 @@ export function compactAgent(a: AgentInfo, demo = false): TimelineAgent {
 
 export function compactRoom(r: RoomInfo, demo = false): TimelineRoom {
   const out: TimelineRoom = { id: r.id, name: r.name, path: r.path, slot: r.slot, seed: r.seed, createdAt: r.createdAt };
+  if (r.floor !== undefined) out.floor = r.floor;
   if (demo) out.demo = true;
   return out;
 }
@@ -436,7 +439,9 @@ export function toAgentInfo(t: TimelineAgent, recent: Activity[] = []): AgentInf
 }
 
 export function toRoomInfo(r: TimelineRoom): RoomInfo {
-  return { id: r.id, name: r.name, path: r.path, slot: r.slot, seed: r.seed, createdAt: r.createdAt };
+  const out: RoomInfo = { id: r.id, name: r.name, path: r.path, slot: r.slot, seed: r.seed, createdAt: r.createdAt };
+  if (r.floor !== undefined) out.floor = r.floor;
+  return out;
 }
 
 export function toAccountInfo(a: TimelineAccount, at: number): AccountInfo {

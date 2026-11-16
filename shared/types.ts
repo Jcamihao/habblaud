@@ -207,6 +207,16 @@ export interface RoomInfo {
   createdAt: number;
   /** Efeito visual temporário na sala (eventos do GitHub detectados nos transcripts; ver shared/github.ts). */
   effect?: RoomEffect;
+  /** Andar da sala (id = pasta da gerência em HABBLAUD_FLOORS). Ausente = térreo, ou sem andares configurados. */
+  floor?: string;
+}
+
+/** Andar do escritório: uma pasta de gerência (HABBLAUD_FLOORS). Só aparece em OfficeSnapshot.floors com sala viva. */
+export interface FloorInfo {
+  /** Caminho normalizado da gerência. */
+  id: string;
+  /** Nome exibido (basename, desambiguado se repetido). */
+  name: string;
 }
 
 /**
@@ -333,6 +343,8 @@ export interface OfficeSnapshot {
   rev: number;
   serverTime: number;
   rooms: RoomInfo[];
+  /** Andares com sala viva, na ordem de HABBLAUD_FLOORS. Ausente sem andares configurados (HABBLAUD_FLOORS). */
+  floors?: FloorInfo[];
   agents: AgentInfo[];
   /** Terminais interativos abertos pelo Habblaud (Claude Code rodando dentro do navegador). */
   ptys?: PtyInfo[];
