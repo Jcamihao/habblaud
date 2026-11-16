@@ -11147,3 +11147,89 @@ html.is-replay #world {
 .ui-world-chip__visitors[hidden] {
   display: none;
 }
+
+/* Seletor de andar (ui/floors.ts): botões na linha de status da barra do topo; só com HABBLAUD_FLOORS. */
+.ui-floors {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ui-floor {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-bg-soft);
+  color: var(--ui-muted);
+  font: 600 11px/1 var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.ui-floor:hover {
+  background: var(--ui-bg-hover);
+  color: var(--ui-text);
+}
+
+.ui-floor:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.ui-floor.is-active {
+  border-color: color-mix(in srgb, var(--ui-accent) 45%, transparent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-text);
+}
+
+.ui-floor__count {
+  min-width: 14px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ui-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.ui-floor__dot {
+  display: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--st-waiting);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--st-waiting) 25%, transparent);
+}
+
+.ui-floor.is-waiting .ui-floor__dot {
+  display: inline-block;
+}
+
+/* Andar da sala na lista lateral: etiqueta discreta depois do nome. */
+.ui-room__floor {
+  flex: none;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 5px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--ui-line);
+  color: var(--ui-faint);
+  font: 600 10px/16px var(--font-ui);
+}
+
+@media (max-width: 600px) {
+  .ui-floor {
+    height: 26px;
+    padding: 0 10px;
+  }
+}

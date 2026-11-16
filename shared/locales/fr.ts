@@ -3292,4 +3292,9 @@ export const FR: Readonly<Record<string, string>> = {
   "Entre no prédio ou chegue mais perto da porta para carimbar.": "Entrez dans l'immeuble ou approchez-vous de la porte pour tamponner.",
   "O carimbo não foi deixado. Tente de novo.": "Le tampon n'a pas été laissé. Réessayez.",
   "Térreo": "Rez-de-chaussée",
+
+  // client/src/ui/floors.ts (seletor de andar)
+  "Andares do escritório": "Étages du bureau",
+  "{0}: agente esperando você": "{0} : agent qui attend votre réponse",
+  "Andar {0}": "Étage {0}",
 };

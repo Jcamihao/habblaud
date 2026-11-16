@@ -16,6 +16,8 @@ import { tr } from '../../../shared/i18n';
 interface RoomRefs {
   head: HTMLButtonElement;
   name: HTMLElement;
+  /** Nome do andar (etiqueta discreta; oculta sem andares). */
+  floor: HTMLElement;
   count: HTMLElement;
   path: HTMLElement;
   accs: KeyedList<AccountInfo | string>;
@@ -197,6 +199,7 @@ export class Sidebar implements UiComponent {
 
   private createRoom(g: RoomGroup): HTMLElement {
     const name = h('span', { class: 'ui-room__name' });
+    const floor = h('span', { class: 'ui-room__floor' });
     const count = h('span', { class: 'ui-room__count' });
     const accsEl = h('span', { class: 'ui-room__accs' });
     const path = h('span', { class: 'ui-room__path' });
@@ -208,7 +211,7 @@ export class Sidebar implements UiComponent {
       'button',
       { class: 'ui-room__head', type: 'button' },
       swatch,
-      h('span', { class: 'ui-room__line' }, name, count, accsEl),
+      h('span', { class: 'ui-room__line' }, name, floor, count, accsEl),
       path,
       tasks,
     );
@@ -239,7 +242,7 @@ export class Sidebar implements UiComponent {
       create: (n) => this.createNode(n),
       update: (el, n) => this.updateNode(el, n),
     });
-    this.roomRefs.set(section, { head, name, count, path, accs, tasks, tasksBar, tasksText, nodes });
+    this.roomRefs.set(section, { head, name, floor, count, path, accs, tasks, tasksBar, tasksText, nodes });
     return section;
   }
 
@@ -247,6 +250,8 @@ export class Sidebar implements UiComponent {
     const r = this.roomRefs.get(section)!;
     const sel = this.ctx.selection();
     setText(r.name, g.room.name);
+    setText(r.floor, g.floorName ?? '');
+    setHidden(r.floor, !g.floorName);
     const present = g.agents.filter((a) => a.status !== 'offline').length;
     setText(r.count, String(present));
     setTitle(r.count, plural(present, tr('agente'), tr('agentes')));

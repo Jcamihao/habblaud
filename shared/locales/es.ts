@@ -3276,4 +3276,9 @@ export const ES: Readonly<Record<string, string>> = {
   "Entre no prédio ou chegue mais perto da porta para carimbar.": "Entra al edificio o acércate más a la puerta para sellar.",
   "O carimbo não foi deixado. Tente de novo.": "El sello no se dejó. Inténtalo de nuevo.",
   "Térreo": "Planta baja",
+
+  // client/src/ui/floors.ts (seletor de andar)
+  "Andares do escritório": "Plantas de la oficina",
+  "{0}: agente esperando você": "{0}: agente esperando a ti",
+  "Andar {0}": "Planta {0}",
 };
