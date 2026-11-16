@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { discoverClaudeDirs } from './accounts/detect';
 import { parseAllowedHosts } from './http/guard';
 import { parseRemoteConfig, type RemoteConfig } from './http/remote';
+import { parseFloors } from './model/floors';
 import { parseGithubRepo } from './updates/checker';
 import { tr } from '../shared/i18n';
 
@@ -58,6 +59,10 @@ export interface ServerConfig {
   remoteWarning?: string;
   /** Habblaud World (server/world/): conta, personagem e, nas próximas fases, o prédio no mundo. */
   world: WorldConfig;
+  /** Andares do escritório (HABBLAUD_FLOORS): cada pasta vira um andar; vazio = sem andares. */
+  floors: string[];
+  /** Entradas de HABBLAUD_FLOORS descartadas (relativas, `/`, vazias ou repetidas), para o log ao iniciar. */
+  floorWarnings: string[];
 }
 
 export interface WorldConfig {
@@ -230,6 +235,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
   const host = env.HABBLAUD_HOST?.trim() || '127.0.0.1';
   const pkg = readPackage(rootDir);
   const remote = parseRemoteConfig(env, inDocker);
+  const floors = parseFloors(env.HABBLAUD_FLOORS);
   return {
     port: Number.isFinite(port) && port > 0 && port < 65536 ? port : 4747,
     host,
@@ -252,5 +258,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     remote: remote.config,
     remoteWarning: remote.warning,
     world: parseWorldConfig(env, argv),
+    floors: floors.floors,
+    floorWarnings: floors.warnings,
   };
 }
