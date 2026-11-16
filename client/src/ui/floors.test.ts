@@ -23,4 +23,7 @@ describe('floorBarModel', () => {
   it('sem tabs devolve lista vazia', () => {
     expect(floorBarModel([], 'g')).toEqual([]);
   });
+  it('andar atual que não está nas abas não marca nenhum botão', () => {
+    expect(floorBarModel(tabs, 'sumiu').some((b) => b.active)).toBe(false);
+  });
 });

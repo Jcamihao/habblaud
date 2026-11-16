@@ -382,4 +382,14 @@ describe('groupRooms com andares', () => {
     expect(g.map((r) => r.room.id)).toEqual(['b', 'a']);
     expect(g.every((r) => r.floorName === undefined)).toBe(true);
   });
+  it('andar desconhecido (fora de floors) vai para o fim, sem nome de andar', () => {
+    const g = groupRooms({ ...floorsSnap, rooms: [fl('z', '/x/sumiu', 0), ...floorsSnap.rooms] });
+    expect(g.map((r) => r.room.id)).toEqual(['a', 'b', 'd', 'c', 'z']);
+    expect(g[4].floorName).toBeUndefined();
+  });
+  it('floors vazio se comporta como sem andares: só por slot, mesmo com room.floor', () => {
+    const g = groupRooms({ rooms: [fl('b', 'g', 1), fl('a', 'h', 0)], agents: [], accounts, floors: [] });
+    expect(g.map((r) => r.room.id)).toEqual(['a', 'b']);
+    expect(g.every((r) => r.floorName === undefined)).toBe(true);
+  });
 });

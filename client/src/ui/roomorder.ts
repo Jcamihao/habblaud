@@ -1,16 +1,27 @@
 // Ordem das salas na lista lateral escolhida pelo usuário (arrastando o cabeçalho da sala), guardada no navegador
 // pelo id da sala (a pasta do projeto). Salas que não estão na ordem guardada vão para o fim, na ordem em que vieram.
+// Com andares (HABBLAUD_FLOORS) a ordem manual vale só dentro de cada andar; a ordem dos andares é fixa.
 const ORDER_KEY = 'habblaud.rooms.order';
 /** Salas lembradas (as mais recentes da lista). */
 const MAX_ROOMS = 100;
 
-export function orderRooms<T>(items: readonly T[], idOf: (item: T) => string): T[] {
-  const saved = loadOrder();
+/**
+ * Aplica a ordem guardada. Com `sectionOf` (andares), a ordem guardada vale só dentro de cada seção: as seções ficam na
+ * ordem em que aparecem em `items` (o chamador já as ordenou) e nunca se misturam. Sem `sectionOf`, é uma lista só.
+ */
+export function orderRooms<T>(items: readonly T[], idOf: (item: T) => string, sectionOf?: (item: T) => string): T[] {
+  return orderBy(items, idOf, loadOrder(), sectionOf);
+}
+
+/** Núcleo puro de `orderRooms` (a ordem guardada entra por parâmetro). */
+export function orderBy<T>(items: readonly T[], idOf: (item: T) => string, saved: readonly string[], sectionOf?: (item: T) => string): T[] {
   if (!saved.length) return items.slice();
   const rank = new Map(saved.map((id, i) => [id, i]));
+  const sections = new Map<string, number>();
+  if (sectionOf) for (const item of items) if (!sections.has(sectionOf(item))) sections.set(sectionOf(item), sections.size);
   return items
-    .map((item, i) => ({ item, i, r: rank.get(idOf(item)) }))
-    .sort((x, y) => (x.r ?? Infinity) - (y.r ?? Infinity) || x.i - y.i)
+    .map((item, i) => ({ item, i, s: sectionOf ? sections.get(sectionOf(item))! : 0, r: rank.get(idOf(item)) }))
+    .sort((x, y) => x.s - y.s || (x.r ?? Infinity) - (y.r ?? Infinity) || x.i - y.i)
     .map((x) => x.item);
 }
 

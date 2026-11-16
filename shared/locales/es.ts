@@ -3279,6 +3279,6 @@ export const ES: Readonly<Record<string, string>> = {
 
   // client/src/ui/floors.ts (seletor de andar)
   "Andares do escritório": "Plantas de la oficina",
-  "{0}: agente esperando você": "{0}: agente esperando a ti",
+  "{0}: agente esperando você": "{0}: agente esperándote",
   "Andar {0}": "Planta {0}",
 };

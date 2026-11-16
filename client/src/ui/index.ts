@@ -250,9 +250,9 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   // Chip "🏙️ no mundo" / "⏸ pausado" na barra do topo (conta aprovada; nunca pela porta do celular).
   const worldChip = new WorldChip(ctx, hw, () => worldDialog.show('home'), (n) => toasts.push(n));
   topbar.addStatus(worldChip.el);
-  // Seletor de andar (só com HABBLAUD_FLOORS): fica na linha de status da barra do topo, como o chip do Mundo.
+  // Seletor de andar (só com HABBLAUD_FLOORS): flutua sob a barra do topo. A linha de status da barra vira um selo de
+  // 12 px abaixo de 1040 px (e no celular), então ali o seletor não caberia.
   const floorBar = new FloorBar(ctx);
-  topbar.addStatus(floorBar.el);
   // "Enquanto você estava fora" ao conectar e o aviso de quem bateu na porta (Fase 5; só pelo próprio computador).
   const worldSocial = new WorldSocialNotifier(ctx, hw, {
     active: () => worldSectionMode(hw.meta(), worldGate(ctx, hw)) === 'active',
@@ -295,7 +295,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   const scrim = h('div', { class: 'ui-scrim', attrs: { 'aria-hidden': 'true' }, on: { click: () => ctx.togglePanel('sidebar', false) } });
 
   root.classList.add('ui-root');
-  root.append(timelapse.vignette, topbar.el, sidebar.el, scrim, feed.el, drawer.el, terminal.el, pty.el, timelapse.el, timelapse.badge, toasts.el, banner.el, update.el, empty.el, popups.el, tip.el, settings.el, worldDialog.el, history.el, deliveries.el, help.el, renamer.el, live, splash.el);
+  root.append(timelapse.vignette, topbar.el, sidebar.el, scrim, feed.el, drawer.el, terminal.el, pty.el, timelapse.el, timelapse.badge, toasts.el, banner.el, floorBar.el, update.el, empty.el, popups.el, tip.el, settings.el, worldDialog.el, history.el, deliveries.el, help.el, renamer.el, live, splash.el);
   area = new FreeArea(world, { root, topbar: topbar.el, sidebar: sidebar.el, drawer: drawer.el, feed: feed.el }, () => ({
     sidebar: panels.sidebar,
     feed: panels.feed,
