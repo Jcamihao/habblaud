@@ -38,13 +38,25 @@ HABBLAUD_FLOORS=/home/caminhao/coding/codeStage,/home/caminhao/coding/praxis.
 - Lida em `server/config.ts`, junto das outras variáveis. Sem a variável (ou vazia): nenhum andar, comportamento atual
   idêntico (tudo no térreo, sem seletor).
 - Cada caminho passa por `normalizeCwd`. Entradas vazias e duplicadas são descartadas.
-- No Docker, os caminhos são os do host, porque os `cwd` das sessões vêm assim dos transcripts. A variável entra pelo
-  `docker-compose.user.yml` (não pelo `docker-compose.override.yml`, que é gerado e recriado). Documentar no README.
+- No Docker, os caminhos são os do host, porque os `cwd` das sessões vêm assim dos transcripts. O `docker-compose.yml`
+  repassa `HABBLAUD_FLOORS: ${HABBLAUD_FLOORS:-}` e o valor fica no `.env` (fora do git), como as outras variáveis. Não
+  usar o `docker-compose.override.yml`, que é gerado e recriado. Documentar no README.
 - O nome do andar é o basename da pasta (`codeStage`, `praxis.`), desambiguado como as salas se houver repetição.
+
+## Sala = pasta de projeto dentro da gerência (decisão do dono, 2026-11-16)
+
+Dentro de um andar, **cada pasta filha direta da gerência é uma sala**: `coding/codeStage/Triluga` é a sala `Triluga`.
+Sessão aberta mais fundo (`coding/codeStage/Triluga/client`) cai na mesma sala `Triluga`, não vira sala nova. Sessão
+aberta na própria pasta da gerência (`coding/codeStage`) é uma sala própria no andar, com o nome da gerência. Fora de
+gerência nada muda: a sala continua sendo o `cwd` exato.
+
+- Ponto único: `server/model/office.ts` (`const roomId = normalizeCwd(p.cwd)`, hoje na linha 325) passa a usar
+  `roomKey(cwd, floors)` de `server/model/floors.ts`.
+- O `path` da sala é a pasta do projeto (o id), então "Nova sessão" abre na pasta do projeto, não na subpasta.
 
 ## Modelo (servidor e `shared/`)
 
-- Nova função pura em `server/model/rooms.ts`: `floorOf(cwd, floors)`. Devolve a pasta-gerência mais específica que
+- Nova função pura em `server/model/floors.ts`: `floorOf(cwd, floors)`. Devolve a pasta-gerência mais específica que
   contém o `cwd` (prefixo por segmento de caminho, nunca por texto: `/a/praxis.` não contém `/a/praxis.x`), ou `undefined`
   para o térreo. O `cwd` igual à própria pasta-gerência (sessão aberta na raiz da gerência) fica no andar dela.
 - `RoomInfo` (`shared/types.ts`) ganha `floor?: string`: id do andar (o caminho normalizado da pasta-gerência).
@@ -74,7 +86,9 @@ HABBLAUD_FLOORS=/home/caminhao/coding/codeStage,/home/caminhao/coding/praxis.
 
 ## Barra lateral e contadores
 
-- A lista de salas é agrupada por andar: cabeçalho com o nome da gerência, térreo primeiro.
+- A lista de salas é ordenada por andar (térreo primeiro, depois a ordem da configuração) e cada sala mostra o nome do
+  andar como etiqueta. Cabeçalhos de grupo ficam fora: a lista usa `KeyedList` por sala e um cabeçalho não encaixa nela
+  sem reescrever a lista.
 - Contadores do topo, uso das contas e feed somam o prédio inteiro, sem filtrar por andar.
 - Textos novos usam `tr('...')`; traduções em `shared/locales/` e `npm run i18n:check` limpo.
 
