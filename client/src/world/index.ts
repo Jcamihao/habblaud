@@ -11,6 +11,7 @@ import { BUILDING_H, COL_W } from './constants';
 import { RECEPTION_ID } from './layout/core';
 import { inRect } from './layout/geometry';
 import { attachInput, type Hit } from './input';
+import { GROUND, filterSnapshotByFloor, floorOfSelection, visibleFloor } from './floor';
 import type { AgentInfo } from '../../../shared/types';
 import { rebaseSnapshot } from './playback';
 import { Overlay } from './render/overlay';
@@ -67,6 +68,9 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   const socialCbs = new Set<(e: SocialEvent) => void>();
   const soundCbs = new Set<(c: SoundCue) => void>();
   const roomMenuCbs = new Set<(roomId: string, at: { x: number; y: number }) => void>();
+  /** Andar mostrado ('' = térreo). Na visita fica sempre no térreo. */
+  let floor = GROUND;
+  const floorCbs = new Set<(id: string) => void>();
   let cues = new SoundCues(sim, camera);
   let selection: Selection = null;
   let hover: string | null = null;
@@ -139,6 +143,9 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   const sameSelection = (a: Selection, b: Selection) => a === b || (!!a && !!b && a.type === b.type && a.id === b.id);
 
   const setSelection = (sel: Selection, focus = false) => {
+    // agente/sala em outro andar: o mundo troca de andar antes (o sim precisa da pessoa para o foco; e o follow nasce depois)
+    const target = sel ? floorOfSelection(store.snapshot, sel) : undefined;
+    if (target !== undefined && target !== floor) setFloor(target);
     const same = sameSelection(sel, selection);
     selection = sel;
     // com "seguir selecionado" ligado, a câmera acompanha o agente escolhido (ou para de seguir)
@@ -171,6 +178,12 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     const zoom = Math.min(4, Math.max(camera.minZoom, camera.snapZoom(fit, 'down')));
     const c = camera.centerFor(rect.x + rect.w / 2, rect.y + rect.h / 2, zoom);
     camera.animateTo(c.x, c.y, zoom, Date.now(), 420);
+  };
+
+  /** Seleção de um andar que não é o mostrado (não some por estar fora da simulação). */
+  const onOtherFloor = (sel: NonNullable<Selection>) => {
+    const f = floorOfSelection(store.snapshot, sel);
+    return f !== undefined && f !== floor;
   };
 
   const zoomStep = (steps: number, sx = camera.viewW / 2, sy = camera.viewH / 2) => {
@@ -249,16 +262,26 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
   const onSnapshot = () => {
     const snap = store.snapshot;
     if (!snap) return;
+    // Um andar por vez: se o andar mostrado sumiu (última sessão saiu), a vista vai para o primeiro. Visita: sem andares.
+    const f = visitMode ? GROUND : visibleFloor(snap, floor);
+    const changed = f !== floor;
     try {
+      if (changed) {
+        floor = f;
+        rebuild();
+      }
+      const shown = visitMode ? snap : filterSnapshotByFloor(snap, floor);
       // No timelapse, os horários do snapshot vão para o relógio do mundo (world/playback.ts).
-      if (playback) sim.applySnapshot(rebaseSnapshot(snap, worldNow - snap.serverTime), worldNow);
-      else sim.applySnapshot(snap, Date.now());
+      if (playback) sim.applySnapshot(rebaseSnapshot(shown, worldNow - snap.serverTime), worldNow);
+      else sim.applySnapshot(shown, Date.now());
+      // seguir um agente que ficou em outro andar: solta a câmera
+      if (changed && camera.follow && !sim.person(camera.follow)) camera.follow = null;
     } catch (err) {
       console.error('[mundo] snapshot inválido ignorado', err);
     }
+    if (changed) floorCbs.forEach((cb) => cb(floor));
   };
   const offSnapshot = store.on('snapshot', onSnapshot);
-  if (store.snapshot) onSnapshot();
 
   void loadWorldAssets(abort.signal).then((a) => {
     if (!a) return;
@@ -314,9 +337,9 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
         const hit = pick(mouse.x, mouse.y);
         setHover(hit?.type === 'agent' ? hit.id : null);
       }
-      // seleção de quem já foi embora
-      if (selection?.type === 'agent' && !sim.chars.has(selection.id)) setSelection(null);
-      if (selection?.type === 'room' && !sim.rooms.has(selection.id)) setSelection(null);
+      // seleção de quem já foi embora (quem está noutro andar continua selecionado)
+      if (selection?.type === 'agent' && !sim.chars.has(selection.id) && !onOtherFloor(selection)) setSelection(null);
+      if (selection?.type === 'room' && !sim.rooms.has(selection.id) && !onOtherFloor(selection)) setSelection(null);
     } catch (err) {
       console.error('[mundo] erro no frame', err);
     }
@@ -385,7 +408,28 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
     setHover(null);
   };
 
+  /** Troca o andar mostrado (ignorado na visita). Recomeça o mundo e enquadra o prédio do andar. */
+  const setFloor = (id: string) => {
+    if (visitMode) return;
+    const f = visibleFloor(store.snapshot, id);
+    if (f === floor) return;
+    floor = f;
+    rebuild();
+    onSnapshot();
+    overview(true);
+    floorCbs.forEach((cb) => cb(floor));
+  };
+
+  // só depois de rebuild existir: o snapshot inicial pode trocar o andar (ver onSnapshot)
+  if (store.snapshot) onSnapshot();
+
   return {
+    floor: () => floor,
+    setFloor,
+    onFloor: (cb) => {
+      floorCbs.add(cb);
+      return () => void floorCbs.delete(cb);
+    },
     select: (sel, opts) => setSelection(sel, !!opts?.focus),
     getSelection: () => selection,
     onSelect: (cb) => {
@@ -473,6 +517,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore, o: Cr
       canvas.removeEventListener('contextmenu', onContextMenu);
       document.removeEventListener('visibilitychange', onVisibility);
       selectCbs.clear();
+      floorCbs.clear();
       hoverCbs.clear();
       socialCbs.clear();
       soundCbs.clear();
