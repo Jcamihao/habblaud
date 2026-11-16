@@ -4,7 +4,7 @@ import { SlotAllocator, normalizeCwd, roomDisplayNames } from './rooms';
 
 /**
  * Lê HABBLAUD_FLOORS (caminhos absolutos separados por vírgula). Descarta, com aviso, entrada vazia, relativa,
- * `/` e repetida. Em `warnings` vai a entrada descartada como foi digitada (sem a barra final).
+ * `/` e repetida. Em `warnings` vai a entrada descartada como foi digitada (só sem os espaços das pontas).
  */
 export function parseFloors(raw: string | undefined): { floors: string[]; warnings: string[] } {
   const floors: string[] = [];

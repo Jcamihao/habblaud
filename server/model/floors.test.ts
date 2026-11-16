@@ -21,6 +21,17 @@ describe('floorOf', () => {
     expect(floorOf('/c/y', ['/c', '/c/g'])).toBe('/c');
   });
 
+  it('gerências irmãs com prefixo de texto em comum não se confundem', () => {
+    expect(floorOf('/c/gg/x', ['/c/g', '/c/gg'])).toBe('/c/gg');
+    expect(floorOf('/c/g/x', ['/c/gg', '/c/g'])).toBe('/c/g');
+    expect(floorOf('/c/gx', ['/c/g'])).toBeUndefined();
+  });
+
+  it('normaliza o cwd: barras repetidas e barra final', () => {
+    expect(floorOf('/c/g//x/', ['/c/g'])).toBe('/c/g');
+    expect(floorOf('/c/g/', ['/c/g'])).toBe('/c/g');
+  });
+
   it('cwd fora de qualquer gerência: undefined', () => {
     expect(floorOf('/outro/lugar', ['/c/g'])).toBeUndefined();
     expect(floorOf('/c/g', [])).toBeUndefined();
@@ -35,6 +46,16 @@ describe('roomKey', () => {
 
   it('a raiz da gerência é sala própria', () => {
     expect(roomKey('/c/g', ['/c/g'])).toBe('/c/g');
+  });
+
+  it('normaliza o cwd dentro da gerência', () => {
+    expect(roomKey('/c/g//Triluga//client/', ['/c/g'])).toBe('/c/g/Triluga');
+    expect(roomKey('/c/g/', ['/c/g'])).toBe('/c/g');
+  });
+
+  it('gerências aninhadas: colapsa pela mais específica', () => {
+    expect(roomKey('/c/g/x/y', ['/c', '/c/g'])).toBe('/c/g/x');
+    expect(roomKey('/c/y/z', ['/c', '/c/g'])).toBe('/c/y');
   });
 
   it('fora de gerência só normaliza', () => {
@@ -53,6 +74,10 @@ describe('parseFloors', () => {
       floors: ['/a', '/b'],
       warnings: ['a/b', '/a', '', '/'],
     });
+  });
+
+  it('barra final e `//` não escapam do descarte', () => {
+    expect(parseFloors('/a,/a/,//,   ')).toEqual({ floors: ['/a'], warnings: ['/a/', '//', ''] });
   });
 
   it('ausente ou vazia: lista vazia e sem avisos', () => {
@@ -143,6 +168,23 @@ describe('FloorSlots', () => {
       2000,
     );
     expect(slots.slotOf('/c/g/D')).toBe(0);
+  });
+
+  it('cooldown de um andar não vaza para outro andar', () => {
+    const slots = new FloorSlots(1000);
+    slots.sync(new Map<string, string | undefined>([['/c/g/A', '/c/g']]), 0);
+    slots.sync(new Map<string, string | undefined>(), 100);
+    slots.sync(new Map<string, string | undefined>([['/c/k/B', '/c/k']]), 200);
+    expect(slots.slotOf('/c/k/B')).toBe(0);
+    // No andar de saída o cooldown vale: a sala nova pula a vaga 0.
+    slots.sync(
+      new Map<string, string | undefined>([
+        ['/c/k/B', '/c/k'],
+        ['/c/g/C', '/c/g'],
+      ]),
+      300,
+    );
+    expect(slots.slotOf('/c/g/C')).toBe(1);
   });
 
   it('sync sem mudança devolve false', () => {
