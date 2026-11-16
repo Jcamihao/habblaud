@@ -127,6 +127,8 @@ export interface SubInput {
 
 interface AgentRecord {
   info: AgentInfo;
+  /** cwd real da sessão principal (a sala pode ser a pasta-mãe, com andares); o "Assumir aqui" retoma nele. */
+  cwd?: string;
   history: Activity[];
   removeAt?: number;
   /** Início do turno atual (para "Concluiu em X"). */
@@ -298,6 +300,15 @@ export class Office {
     return this.rooms.get(roomId)?.path;
   }
 
+  /**
+   * Pasta onde a sessão rodou. Com andares, a sala é a pasta-mãe e não serve para retomar: `claude --resume`
+   * procura a sessão pela pasta exata. Sem o registro (subagente), cai na pasta da sala.
+   */
+  agentCwd(agentId: string): string | undefined {
+    const rec = this.agents.get(agentId);
+    return rec?.cwd ?? (rec ? this.roomPath(rec.info.roomId) : undefined);
+  }
+
   roomName(roomId: string): string {
     return this.roomNames.get(roomId) ?? roomId.split('/').filter(Boolean).pop() ?? roomId;
   }
@@ -358,7 +369,7 @@ export class Office {
       if (chosen.parts) info.parts = { ...chosen.parts };
     }
     if (p.status === 'waiting') info.waitingFor = p.waitingFor ?? tr('responder no terminal');
-    const rec: AgentRecord = { info, history: [] };
+    const rec: AgentRecord = { info, cwd: p.cwd, history: [] };
     if (p.status === 'working') rec.turnStart = now;
     this.agents.set(p.id, rec);
     const acc = this.deps.accountName(p.account);
