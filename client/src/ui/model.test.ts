@@ -355,3 +355,41 @@ describe('textos da espera', () => {
     expect(shellDoneKind(undefined)).toBeNull();
   });
 });
+
+describe('groupRooms com andares', () => {
+  const fl = (id: string, floor?: string, slot = 0): RoomInfo => ({ ...room(id, slot), floor });
+  const ag = (id: string, roomId: string) => agent({ id, roomId });
+  // "a" (térreo) e "b" (andar g) repetem slot 0; "c" (andar h) repete slot 1.
+  const floorsSnap = {
+    rooms: [fl('c', 'h', 1), fl('b', 'g', 0), fl('a', undefined, 0), fl('d', 'g', 1)],
+    agents: [ag('x1', 'a'), ag('x2', 'b'), ag('x3', 'c'), ag('x4', 'd')],
+    accounts,
+    floors: [
+      { id: 'g', name: 'Gerência G' },
+      { id: 'h', name: 'Gerência H' },
+    ],
+  };
+  it('ordena por andar (térreo primeiro, depois ordem de floors) e por slot dentro do andar', () => {
+    const g = groupRooms(floorsSnap);
+    expect(g.map((r) => r.room.id)).toEqual(['a', 'b', 'd', 'c']);
+  });
+  it('floorName é o nome do andar; ausente no térreo', () => {
+    const g = groupRooms(floorsSnap);
+    expect(g.map((r) => r.floorName)).toEqual([undefined, 'Gerência G', 'Gerência G', 'Gerência H']);
+  });
+  it('sem floors a ordem é só por slot e floorName fica ausente', () => {
+    const g = groupRooms({ rooms: [fl('a', undefined, 2), fl('b', undefined, 0)], agents: [], accounts });
+    expect(g.map((r) => r.room.id)).toEqual(['b', 'a']);
+    expect(g.every((r) => r.floorName === undefined)).toBe(true);
+  });
+  it('andar desconhecido (fora de floors) vai para o fim, sem nome de andar', () => {
+    const g = groupRooms({ ...floorsSnap, rooms: [fl('z', '/x/sumiu', 0), ...floorsSnap.rooms] });
+    expect(g.map((r) => r.room.id)).toEqual(['a', 'b', 'd', 'c', 'z']);
+    expect(g[4].floorName).toBeUndefined();
+  });
+  it('floors vazio se comporta como sem andares: só por slot, mesmo com room.floor', () => {
+    const g = groupRooms({ rooms: [fl('b', 'g', 1), fl('a', 'h', 0)], agents: [], accounts, floors: [] });
+    expect(g.map((r) => r.room.id)).toEqual(['a', 'b']);
+    expect(g.every((r) => r.floorName === undefined)).toBe(true);
+  });
+});

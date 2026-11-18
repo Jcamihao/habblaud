@@ -41,6 +41,7 @@ external calls.
 ## Contents
 
 - [What it looks like](#what-it-looks-like)
+- [Floors per group](#floors-per-group)
 - [Installation](#installation)
 - [How to use](#how-to-use)
 - [Accounts and usage (5-hour and weekly)](#accounts-and-usage-5-hour-and-weekly)
@@ -122,6 +123,29 @@ shrinks on its own.
 </table>
 
 > The images above use **demo mode** (made-up projects, people and accounts).
+
+## Floors per group
+
+If you organize projects into group folders (e.g. `coding/codeStage` and `coding/praxis.`), the office can show each
+group as a **floor**, with a selector to switch floors.
+
+**How to turn it on.** List the group folders in `HABBLAUD_FLOORS`, comma-separated, as absolute paths:
+
+```
+HABBLAUD_FLOORS=/home/me/coding/codeStage,/home/me/coding/praxis.
+```
+
+**How rooms land on floors.**
+
+- Each direct child folder of a group is a room. A session opened in a subfolder (e.g. `codeStage/Triluga/client`) goes
+  to the room `codeStage/Triluga`.
+- Rooms outside any group (e.g. `coding` itself) stay on the **ground floor**.
+- Without the variable, nothing changes: the office works as before, with no floor selector.
+
+**Heads-up.** Turning it on changes the id and path of the rooms inside the groups: room nicknames saved before stop
+applying, and the day's timelapse mixes old and new ids.
+
+**In Docker**, the value goes in `.env`, with the host's paths. Run `npm run docker:up` again to apply it.
 
 ## Installation
 
@@ -716,6 +740,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_HOST` | `127.0.0.1` | Server interface in Node mode. Anything other than `127.0.0.1`/`localhost` turns off the terminal (and answering and sending messages from the office). |
 | `HABBLAUD_BIND` | `127.0.0.1` | Docker only (in `.env`): where the port is published. `0.0.0.0` opens it to the local network (and turns off the terminal and anything that acts on the sessions). |
 | `HABBLAUD_CLAUDE_DIRS` | automatic detection | Account folders, comma-separated (e.g. `/caminho/conta1,/caminho/conta2`). |
+| `HABBLAUD_FLOORS` | off | Group folders, comma-separated; each one becomes a floor in the office (e.g. `/home/me/coding/codeStage,/home/me/coding/praxis.`). See [Floors per group](#floors-per-group). |
 | `HABBLAUD_DATA_DIR` | `~/.habblaud` | Where Habblaud keeps its own data (character and room names, the timelapse timeline and the My day stats). |
 | `HABBLAUD_TIMELINE` | on | `0` turns off timeline recording (the days already recorded stay in the timelapse). In Docker it's always on. |
 | `HABBLAUD_USAGE_DIR` | `~/.habblaud/usage` | Where the mod (or the statusline tap) writes usage. |

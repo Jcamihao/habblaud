@@ -71,6 +71,7 @@ if (!config.inDocker) {
 }
 const legacyEnv = legacyEnvWarning(Object.keys(process.env));
 if (legacyEnv) log.warn(legacyEnv);
+for (const entrada of config.floorWarnings) log.warn(tr('HABBLAUD_FLOORS: entrada ignorada ({0}).', [entrada]));
 
 const names = new NameStore(join(config.dataDir, 'names.json'));
 names.load();
@@ -116,6 +117,7 @@ const accounts = new AccountsService({
 const office = new Office({
   names,
   roomAlias: (path) => roomAliases.get(path),
+  floors: config.floors,
   version: config.version,
   // No modo dev o Vite serve o cliente direto do código-fonte: não há build para comparar.
   build: config.dev ? undefined : createBuildReader(config.rootDir),
@@ -307,7 +309,7 @@ const ptys = spawnPty
       accounts: () => accounts.entries().map((a) => ({ id: a.id, dir: a.dir, isDefault: isDefaultDir(a.dir, config.home) })),
       agent: (id) => {
         const a = office.get(id);
-        return a && { id: a.id, kind: a.kind, account: a.account, sessionId: a.sessionId, cwd: office.roomPath(a.roomId) };
+        return a && { id: a.id, kind: a.kind, account: a.account, sessionId: a.sessionId, cwd: office.agentCwd(a.id) };
       },
       onChange: () => office.markDirty(),
       createScreen: ptyScreen,

@@ -1708,6 +1708,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Falha no relógio do escritório: {0}": "Office clock failed: {0}",
   "Erro ao responder {0} {1}: {2}": "Error responding to {0} {1}: {2}",
   "A porta {0} já está em uso (defina HABBLAUD_PORT para usar outra).": "Port {0} is already in use (set HABBLAUD_PORT to use another one).",
+  "HABBLAUD_FLOORS: entrada ignorada ({0}).": "HABBLAUD_FLOORS: entry ignored ({0}).",
   "Erro no servidor HTTP: {0}": "HTTP server error: {0}",
   "🏢 Habblaud {0}{1}{2} em http://{3}:{4}": "🏢 Habblaud {0}{1}{2} at http://{3}:{4}",
   "Nenhuma pasta do Claude Code encontrada (defina HABBLAUD_CLAUDE_DIRS).": "No Claude Code folder found (set HABBLAUD_CLAUDE_DIRS).",
@@ -3273,4 +3274,10 @@ export const EN: Readonly<Record<string, string>> = {
   "Carimbo deixado na portaria: {0}": "Stamp left at the front desk: {0}",
   "Entre no prédio ou chegue mais perto da porta para carimbar.": "Go into the building or get closer to the door to stamp.",
   "O carimbo não foi deixado. Tente de novo.": "The stamp wasn't left. Try again.",
+  "Térreo": "Ground floor",
+
+  // client/src/ui/floors.ts (seletor de andar)
+  "Andares do escritório": "Office floors",
+  "{0}: agente esperando você": "{0}: agent waiting for you",
+  "Andar {0}": "Floor {0}",
 };

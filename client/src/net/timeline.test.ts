@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DemoSimulator } from '../../../shared/demo/simulator';
+import type { OfficeSnapshot } from '../../../shared/types';
 import {
   compactSnapshot,
   diffFrames,
@@ -174,5 +175,25 @@ describe('reconstrução do timelapse', () => {
       const got = sequential.snapshot(t, view).agents.map((a) => `${a.id}|${a.status}|${a.activity?.text ?? ''}|${a.shells?.length ?? 0}`).sort();
       expect(got).toEqual(ids(truth.filter((x) => x.at <= t).at(-1)!.frame));
     }
+  });
+
+  it('andar da sala: vai para o quadro (JSON), volta no replay com floors; quadro antigo sem andar fica sem floors', () => {
+    const room = (id: string, floor?: string) => ({ id, name: id.split('/').pop()!, path: id, slot: 0, seed: 1, createdAt: T0, ...(floor ? { floor } : {}) });
+    const snap = (rooms: ReturnType<typeof room>[]) => compactSnapshot({ rooms, agents: [], accounts: [] } as unknown as OfficeSnapshot);
+    const roundTrip = (rec: TimelineRecord): TimelineRecord => JSON.parse(JSON.stringify(rec));
+
+    const withFloor = roundTrip(keyframeOf(snap([room('/c/g/Triluga', '/c/g'), room('/c/solto')]), T0, 5 * MIN, true));
+    const r = new TimelineReplay('2026-10-07', [withFloor]);
+    const s1 = at(r, T0);
+    expect(s1.rooms.map((x) => [x.id, x.floor])).toEqual([
+      ['/c/solto', undefined],
+      ['/c/g/Triluga', '/c/g'],
+    ]);
+    expect(s1.floors).toEqual([{ id: '/c/g', name: 'g' }]);
+
+    const old = new TimelineReplay('2026-10-07', [roundTrip(key(T0, [], { boot: true }))]);
+    const s2 = at(old, T0);
+    expect(s2.rooms.every((x) => x.floor === undefined)).toBe(true);
+    expect('floors' in s2).toBe(false);
   });
 });

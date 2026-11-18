@@ -46,6 +46,8 @@ import { worldSectionMode } from './world/world-model';
 import { SceneSwitch, type CitySceneHost } from './world/scene-switch';
 import { worldSource } from '../net/world';
 import { FreeArea } from './viewport';
+import { FloorBar } from './floors';
+import { GROUND } from '../world/floor';
 import { tr } from '../../../shared/i18n';
 
 /** Relógio dos tempos relativos ("há 5 s"). */
@@ -103,6 +105,8 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
     account: (id) => store.snapshot?.accounts.find((a) => a.id === id),
     agent: (id) => store.agent(id),
     selection: () => selection,
+    floor: () => world.floor?.() ?? GROUND,
+    setFloor: (id) => world.setFloor?.(id),
     select(sel, opts) {
       // Na cidade o escritório (gaveta, terminal) fica escondido: escolher um agente ou sala volta para ele. Antes de
       // tudo: a área livre só mede a gaveta e a barra lateral sem a classe `is-city`.
@@ -246,6 +250,9 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   // Chip "🏙️ no mundo" / "⏸ pausado" na barra do topo (conta aprovada; nunca pela porta do celular).
   const worldChip = new WorldChip(ctx, hw, () => worldDialog.show('home'), (n) => toasts.push(n));
   topbar.addStatus(worldChip.el);
+  // Seletor de andar (só com HABBLAUD_FLOORS): flutua sob a barra do topo. A linha de status da barra vira um selo de
+  // 12 px abaixo de 1040 px (e no celular), então ali o seletor não caberia.
+  const floorBar = new FloorBar(ctx);
   // "Enquanto você estava fora" ao conectar e o aviso de quem bateu na porta (Fase 5; só pelo próprio computador).
   const worldSocial = new WorldSocialNotifier(ctx, hw, {
     active: () => worldSectionMode(hw.meta(), worldGate(ctx, hw)) === 'active',
@@ -288,8 +295,8 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   const scrim = h('div', { class: 'ui-scrim', attrs: { 'aria-hidden': 'true' }, on: { click: () => ctx.togglePanel('sidebar', false) } });
 
   root.classList.add('ui-root');
-  root.append(timelapse.vignette, topbar.el, sidebar.el, scrim, feed.el, drawer.el, terminal.el, pty.el, timelapse.el, timelapse.badge, toasts.el, banner.el, update.el, empty.el, popups.el, tip.el, settings.el, worldDialog.el, history.el, deliveries.el, help.el, renamer.el, live, splash.el);
-  area = new FreeArea(world, { root, topbar: topbar.el, sidebar: sidebar.el, drawer: drawer.el, feed: feed.el }, () => ({
+  root.append(timelapse.vignette, topbar.el, sidebar.el, scrim, feed.el, drawer.el, terminal.el, pty.el, timelapse.el, timelapse.badge, toasts.el, banner.el, floorBar.el, update.el, empty.el, popups.el, tip.el, settings.el, worldDialog.el, history.el, deliveries.el, help.el, renamer.el, live, splash.el);
+  area = new FreeArea(world, { root, topbar: topbar.el, sidebar: sidebar.el, drawer: drawer.el, feed: feed.el, floors: floorBar.el }, () => ({
     sidebar: panels.sidebar,
     feed: panels.feed,
     drawer: selection !== null && !drawer.floating,
@@ -297,7 +304,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   }));
   drawer.onLayoutChange = () => applyLayout();
 
-  const components: UiComponent[] = [topbar, sidebar, drawer, terminal, pty, history, deliveries, feed, toasts, settings, empty, banner, tip, notifier, splash, timelapse, sound, day, updateToaster, worldDialog, popups, worldChip];
+  const components: UiComponent[] = [topbar, sidebar, drawer, terminal, pty, history, deliveries, feed, toasts, settings, empty, banner, tip, notifier, splash, timelapse, sound, day, updateToaster, worldDialog, popups, worldChip, floorBar];
   if (scene) components.push(scene);
   root.append(worldSocial.el);
   components.push(worldSocial);

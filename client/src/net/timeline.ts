@@ -2,7 +2,7 @@
 // reconstrói o escritório num instante qualquer do dia (formato em shared/timeline.ts). A reconstrução
 // parte do keyframe anterior e aplica os deltas até o instante; andando para a frente, só aplica o que
 // falta. Também resume o dia (agentes presentes e trabalhando por minuto) para o gráfico e os picos.
-import type { Activity, OfficeSnapshot } from '../../../shared/types';
+import type { Activity, FloorInfo, OfficeSnapshot, RoomInfo } from '../../../shared/types';
 import {
   applyChanges,
   emptyFrame,
@@ -171,10 +171,13 @@ export class TimelineReplay {
       : [...this.frame.agents.values()].filter((a) => visible(a.demo, view)).map((a) => toAgentInfo(a, this.recent.get(a.id) ?? []));
     const rooms = off ? [] : [...this.frame.rooms.values()].filter((r) => visible(r.demo, view)).map(toRoomInfo);
     const accounts = [...this.frame.accounts.values()].filter((a) => visible(a.demo, view)).map((a) => toAccountInfo(a, t));
+    const floors = floorsOf(rooms);
     return {
       rev: ++this.rev,
       serverTime: t,
-      rooms: rooms.sort((a, b) => a.slot - b.slot),
+      // Como no servidor: térreo primeiro, depois os andares (por id), dentro de cada um pela vaga.
+      rooms: rooms.sort((a, b) => floorRank(a.floor, floors) - floorRank(b.floor, floors) || a.slot - b.slot),
+      ...(floors.length ? { floors } : {}),
       agents,
       accounts,
       meta: {
@@ -304,6 +307,26 @@ export class TimelineReplay {
     }
     return ans;
   }
+}
+
+/**
+ * Andares do quadro: os que têm sala no instante, em ordem de id. O quadro não guarda a ordem de HABBLAUD_FLOORS,
+ * então a ordem do replay pode diferir da ao vivo. Nome: basename; se repetido, as duas últimas pastas.
+ */
+function floorsOf(rooms: RoomInfo[]): FloorInfo[] {
+  const ids = [...new Set(rooms.map((r) => r.floor).filter((f): f is string => f !== undefined))].sort();
+  const base = (id: string) => id.split('/').filter(Boolean).pop() ?? id;
+  const count = new Map<string, number>();
+  for (const id of ids) count.set(base(id), (count.get(base(id)) ?? 0) + 1);
+  return ids.map((id) => {
+    const name = base(id);
+    if ((count.get(name) ?? 0) < 2) return { id, name };
+    return { id, name: id.split('/').filter(Boolean).slice(-2).join('/') };
+  });
+}
+
+function floorRank(floor: string | undefined, floors: FloorInfo[]): number {
+  return floor === undefined ? -1 : floors.findIndex((f) => f.id === floor);
 }
 
 function count(frame: TimelineFrame, view: ReplayView): { present: number; working: number; waiting: number } {

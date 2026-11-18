@@ -54,6 +54,10 @@ export interface UiContext {
   focusSelection(): void;
   /** Comandos de câmera dos botões/atalhos da UI (cancelam o foco mantido). */
   camera(action: 'overview' | 'zoomIn' | 'zoomOut'): void;
+  /** Andar mostrado agora (GROUND = térreo). Sem andares configurados, é sempre o térreo. */
+  floor(): string;
+  /** Troca o andar mostrado (a barra de andar; o mundo mostra só ele). */
+  setFloor(id: string): void;
   /** Agenda uma renderização no próximo quadro. */
   invalidate(): void;
   /** Abre/fecha um painel (sem argumento: alterna). */

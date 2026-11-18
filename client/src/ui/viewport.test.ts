@@ -25,6 +25,13 @@ describe('computeInsets', () => {
     });
   });
 
+  it('seletor de andar visível: o enquadramento desce a altura dele; sem seletor, nada muda', () => {
+    const flags = { sidebar: false, feed: false, drawer: false, narrow: false };
+    expect(computeInsets({ ...desktop, floorsH: 28 }, flags).top).toBe(64 + 28 + g);
+    expect(computeInsets({ ...desktop, floorsH: 0 }, flags).top).toBe(64 + g);
+    expect(computeInsets(desktop, flags).top).toBe(64 + g);
+  });
+
   it('gaveta aberta conta à direita; feed recolhido ainda ocupa a faixa do cabeçalho', () => {
     expect(computeInsets(desktop, { sidebar: false, feed: false, drawer: true, narrow: false })).toEqual({
       top: 64 + g,

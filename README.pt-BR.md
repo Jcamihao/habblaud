@@ -40,6 +40,7 @@ para dar a letra de cada conta). Nada sai do computador: o Habblaud não lê cre
 ## Sumário
 
 - [Como é](#como-é)
+- [Andares por gerência](#andares-por-gerência)
 - [Instalação](#instalação)
 - [Como usar](#como-usar)
 - [Contas e uso (5 horas e semanal)](#contas-e-uso-5-horas-e-semanal)
@@ -120,6 +121,29 @@ ela, e o endereço antigo apaga e é desmontado. Assim o prédio não fica com b
 </table>
 
 > As imagens acima usam o **modo demonstração** (projetos, pessoas e contas fictícios).
+
+## Andares por gerência
+
+Se você organiza os projetos em pastas-gerência (ex.: `coding/codeStage` e `coding/praxis.`), o escritório pode mostrar
+cada gerência como um **andar**, com um seletor para trocar de andar.
+
+**Como ligar.** Liste as gerências em `HABBLAUD_FLOORS`, separadas por vírgula, com caminhos absolutos:
+
+```
+HABBLAUD_FLOORS=/home/me/coding/codeStage,/home/me/coding/praxis.
+```
+
+**Como as salas caem nos andares.**
+
+- Cada pasta filha direta da gerência é uma sala. Uma sessão aberta numa subpasta (ex.: `codeStage/Triluga/client`) cai
+  na sala `codeStage/Triluga`.
+- Salas fora de qualquer gerência (ex.: a própria `coding`) ficam no **térreo**.
+- Sem a variável, nada muda: o escritório continua como antes, sem seletor de andar.
+
+**Atenção.** Ligar a variável muda o id e o caminho das salas dentro das gerências: apelidos de sala salvos antes deixam
+de valer, e o timelapse do dia mistura ids antigos e novos.
+
+**No Docker**, o valor vai no `.env`, com os caminhos do host. Rode `npm run docker:up` de novo para aplicar.
 
 ## Instalação
 
@@ -714,6 +738,7 @@ Tudo funciona sem configurar nada. Se precisar ajustar, use variáveis de ambien
 | `HABBLAUD_HOST` | `127.0.0.1` | Interface do servidor no modo Node. Fora de `127.0.0.1`/`localhost`, o terminal (e responder e mandar mensagens pelo escritório) fica desligado. |
 | `HABBLAUD_BIND` | `127.0.0.1` | Só Docker (no `.env`): onde a porta é publicada. `0.0.0.0` libera a rede local (e desliga o terminal e o que age sobre as sessões). |
 | `HABBLAUD_CLAUDE_DIRS` | detecção automática | Pastas das contas, separadas por vírgula (ex.: `/caminho/conta1,/caminho/conta2`). |
+| `HABBLAUD_FLOORS` | desligado | Pastas-gerência separadas por vírgula; cada uma vira um andar do escritório (ex.: `/home/me/coding/codeStage,/home/me/coding/praxis.`). Ver [Andares por gerência](#andares-por-gerência). |
 | `HABBLAUD_DATA_DIR` | `~/.habblaud` | Onde o Habblaud guarda os próprios dados (nomes dos personagens e das salas, linha do tempo do timelapse e estatísticas do Meu dia). |
 | `HABBLAUD_TIMELINE` | ligado | `0` desliga a gravação da linha do tempo (os dias já gravados continuam no timelapse). No Docker fica sempre ligado. |
 | `HABBLAUD_USAGE_DIR` | `~/.habblaud/usage` | Onde o mod (ou o tap de statusline) grava o uso. |

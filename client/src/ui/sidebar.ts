@@ -11,11 +11,14 @@ import { groupRooms, type AgentNode, type RoomGroup } from './model';
 import { officeIsEmpty } from './overlays';
 import { createAgentRow, updateAgentRow } from './rows';
 import { createAccountChip, createProgress, updateAccountChip, updateProgress } from './widgets';
+import { floorOfRoom } from '../world/floor';
 import { tr } from '../../../shared/i18n';
 
 interface RoomRefs {
   head: HTMLButtonElement;
   name: HTMLElement;
+  /** Nome do andar (etiqueta discreta; oculta sem andares). */
+  floor: HTMLElement;
   count: HTMLElement;
   path: HTMLElement;
   accs: KeyedList<AccountInfo | string>;
@@ -52,6 +55,8 @@ export class Sidebar implements UiComponent {
   /** Sala sendo arrastada (reordenar as salas) e a ordem mostrada agora. */
   private draggingRoom: string | null = null;
   private shownRooms: string[] = [];
+  /** Andar de cada sala mostrada: arrastar uma sala só vale dentro do próprio andar. */
+  private roomFloors = new Map<string, string>();
   private empty: HTMLElement;
   private emptyText: HTMLElement;
   private clearBtn: HTMLButtonElement;
@@ -150,8 +155,10 @@ export class Sidebar implements UiComponent {
     setHidden(this.filters, accounts.length <= 1);
 
     // Ordem das salas escolhida pelo usuário (arrastando o cabeçalho da sala).
-    const groups = orderRooms(groupRooms(snap, { query: this.query, hiddenAccounts: hidden }), (g) => g.room.id);
+    // Com andares, só dentro de cada andar: o agrupamento por andar de groupRooms não se desfaz.
+    const groups = orderRooms(groupRooms(snap, { query: this.query, hiddenAccounts: hidden }), (g) => g.room.id, snap?.floors?.length ? (g) => floorOfRoom(g.room) : undefined);
     this.shownRooms = groups.map((g) => g.room.id);
+    this.roomFloors = new Map(groups.map((g) => [g.room.id, floorOfRoom(g.room)]));
     this.rooms.sync(groups);
 
     const filtering = this.query.trim().length > 0 || hidden.size > 0;
@@ -197,6 +204,7 @@ export class Sidebar implements UiComponent {
 
   private createRoom(g: RoomGroup): HTMLElement {
     const name = h('span', { class: 'ui-room__name' });
+    const floor = h('span', { class: 'ui-room__floor' });
     const count = h('span', { class: 'ui-room__count' });
     const accsEl = h('span', { class: 'ui-room__accs' });
     const path = h('span', { class: 'ui-room__path' });
@@ -208,7 +216,7 @@ export class Sidebar implements UiComponent {
       'button',
       { class: 'ui-room__head', type: 'button' },
       swatch,
-      h('span', { class: 'ui-room__line' }, name, count, accsEl),
+      h('span', { class: 'ui-room__line' }, name, floor, count, accsEl),
       path,
       tasks,
     );
@@ -239,7 +247,7 @@ export class Sidebar implements UiComponent {
       create: (n) => this.createNode(n),
       update: (el, n) => this.updateNode(el, n),
     });
-    this.roomRefs.set(section, { head, name, count, path, accs, tasks, tasksBar, tasksText, nodes });
+    this.roomRefs.set(section, { head, name, floor, count, path, accs, tasks, tasksBar, tasksText, nodes });
     return section;
   }
 
@@ -247,6 +255,8 @@ export class Sidebar implements UiComponent {
     const r = this.roomRefs.get(section)!;
     const sel = this.ctx.selection();
     setText(r.name, g.room.name);
+    setText(r.floor, g.floorName ?? '');
+    setHidden(r.floor, !g.floorName);
     const present = g.agents.filter((a) => a.status !== 'offline').length;
     setText(r.count, String(present));
     setTitle(r.count, plural(present, tr('agente'), tr('agentes')));
@@ -269,6 +279,10 @@ export class Sidebar implements UiComponent {
     const ordered = orderAgents(g.room.id, g.nodes, (n) => n.agent.sessionId);
     this.shown.set(g.room.id, ordered);
     r.nodes.sync(ordered);
+  }
+
+  private sameFloor(a: string, b: string): boolean {
+    return this.roomFloors.get(a) === this.roomFloors.get(b);
   }
 
   /** Arrastar o cabeçalho de uma sala reordena as salas da lista. */
@@ -296,7 +310,7 @@ export class Sidebar implements UiComponent {
     });
     head.addEventListener('dragover', (e) => {
       const from = this.draggingRoom;
-      if (!from || from === roomId) return;
+      if (!from || from === roomId || !this.sameFloor(from, roomId)) return;
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
       clear();
@@ -306,7 +320,7 @@ export class Sidebar implements UiComponent {
     head.addEventListener('drop', (e) => {
       const from = this.draggingRoom;
       clear();
-      if (!from || from === roomId) return;
+      if (!from || from === roomId || !this.sameFloor(from, roomId)) return;
       e.preventDefault();
       if (moveRoom(this.shownRooms, from, roomId, after(e))) this.ctx.invalidate();
     });

@@ -75,6 +75,12 @@ export interface WorldApi {
    * (visão geral) e centralizar (focusAgent/focusRoom/seguir) dentro da área livre.
    */
   setViewInsets?(insets: Partial<ViewInsets>): void;
+  /** (Opcional, aditivo) Andar mostrado agora: id do andar, ou '' (GROUND) para o térreo. */
+  floor?(): string;
+  /** (Opcional, aditivo) Troca o andar mostrado (um andar por vez). Ignorado na visita. */
+  setFloor?(id: string): void;
+  /** (Opcional, aditivo) Disparado quando o andar mostrado muda (pelo usuário, por seleção ou por sumir o andar). */
+  onFloor?(cb: (id: string) => void): () => void;
   /**
    * (Opcional, aditivo) Vida social de um agente presente no escritório: personalidade, carteira de
    * moedinhas, amizades/rivalidades com quem está lá agora e a roda de que participa. null se não está.

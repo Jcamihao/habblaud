@@ -3,6 +3,7 @@
 import type { AccountInfo, Activity, AgentInfo, AgentStatus, OfficeSnapshot, RoomInfo, ShellJob, TaskItem } from '../../../shared/types';
 import { formatElapsed, normalizeSearch } from './format';
 import { tr } from '../../../shared/i18n';
+import { floorOfRoom, GROUND } from '../world/floor';
 
 export const STATUS_LABEL: Record<AgentStatus, string> = {
   working: tr('Trabalhando'),
@@ -318,6 +319,8 @@ export interface RoomGroup {
   tasks: TaskProgress;
   /** Quantos agentes da sala passam no filtro. */
   matches: number;
+  /** Nome do andar da sala (HABBLAUD_FLOORS); ausente no térreo e sem andares configurados. */
+  floorName?: string;
 }
 
 function accountText(account: AccountInfo | undefined): string {
@@ -350,14 +353,21 @@ export function matchesQuery(agent: AgentInfo, room: RoomInfo | undefined, accou
 const byArrival = (a: AgentInfo, b: AgentInfo) => a.startedAt - b.startedAt || a.id.localeCompare(b.id);
 
 /**
- * Agrupa o snapshot em salas (ordenadas por slot) -> agentes principais -> subagentes.
+ * Agrupa o snapshot em salas (ordenadas por andar e depois por slot) -> agentes principais -> subagentes.
  * Subagentes cujo pai não está na mesma sala viram itens de primeiro nível.
  * Com filtro: um principal aparece se ele ou algum subagente bater; se o principal bate, todos os subs aparecem.
  * Salas sem nenhum agente visível são omitidas (exceto sem filtro ativo).
  */
-export function groupRooms(snap: Pick<OfficeSnapshot, 'rooms' | 'agents' | 'accounts'> | null, filter?: AgentFilter): RoomGroup[] {
+export function groupRooms(snap: Pick<OfficeSnapshot, 'rooms' | 'agents' | 'accounts' | 'floors'> | null, filter?: AgentFilter): RoomGroup[] {
   if (!snap) return [];
   const accounts = new Map(snap.accounts.map((a) => [a.id, a]));
+  // Posição do andar: térreo = 0, depois a ordem de snap.floors. Sem floors, todas as salas são 0 (ordem só por slot).
+  const floorPos = new Map((snap.floors ?? []).map((f, i) => [f.id, i + 1]));
+  const floorNames = new Map((snap.floors ?? []).map((f) => [f.id, f.name]));
+  const posOf = (room: RoomInfo) => {
+    const f = floorOfRoom(room);
+    return f === GROUND ? 0 : (floorPos.get(f) ?? floorPos.size + 1);
+  };
   const accountOrder = new Map(snap.accounts.map((a, i) => [a.id, i]));
   const query = filter?.query.trim() ?? '';
   const hidden = filter?.hiddenAccounts ?? new Set<string>();
@@ -371,7 +381,7 @@ export function groupRooms(snap: Pick<OfficeSnapshot, 'rooms' | 'agents' | 'acco
   }
 
   const groups: RoomGroup[] = [];
-  for (const room of [...snap.rooms].sort((a, b) => a.slot - b.slot)) {
+  for (const room of [...snap.rooms].sort((a, b) => posOf(a) - posOf(b) || a.slot - b.slot)) {
     const agents = (byRoom.get(room.id) ?? []).slice().sort(byArrival);
     const visible = (a: AgentInfo) => !hidden.has(a.account) && matchesQuery(a, room, accounts.get(a.account), query);
     const ids = new Set(agents.map((a) => a.id));
@@ -400,7 +410,9 @@ export function groupRooms(snap: Pick<OfficeSnapshot, 'rooms' | 'agents' | 'acco
     if (filtering && nodes.length === 0) continue;
 
     const present = [...new Set(agents.map((a) => a.account))].sort((x, y) => (accountOrder.get(x) ?? 99) - (accountOrder.get(y) ?? 99));
-    groups.push({ room, accounts: present, nodes, agents, tasks: aggregateTasks(agents), matches });
+    const floor = floorOfRoom(room);
+    const floorName = floor === GROUND ? undefined : floorNames.get(floor);
+    groups.push({ room, accounts: present, nodes, agents, tasks: aggregateTasks(agents), matches, floorName });
   }
   return groups;
 }

@@ -1572,6 +1572,7 @@ export const FR: Readonly<Record<string, string>> = {
   "Falha no relógio do escritório: {0}": "Échec de l'horloge du bureau : {0}",
   "Erro ao responder {0} {1}: {2}": "Erreur en répondant à {0} {1} : {2}",
   "A porta {0} já está em uso (defina HABBLAUD_PORT para usar outra).": "Le port {0} est déjà utilisé (définissez HABBLAUD_PORT pour en utiliser un autre).",
+  "HABBLAUD_FLOORS: entrada ignorada ({0}).": "HABBLAUD_FLOORS : entrée ignorée ({0}).",
   "Erro no servidor HTTP: {0}": "Erreur du serveur HTTP : {0}",
   "🏢 Habblaud {0}{1}{2} em http://{3}:{4}": "🏢 Habblaud {0}{1}{2} sur http://{3}:{4}",
   "Nenhuma pasta do Claude Code encontrada (defina HABBLAUD_CLAUDE_DIRS).": "Aucun dossier Claude Code trouvé (définissez HABBLAUD_CLAUDE_DIRS).",
@@ -3290,4 +3291,10 @@ export const FR: Readonly<Record<string, string>> = {
   "Carimbo deixado na portaria: {0}": "Tampon laissé à l'accueil : {0}",
   "Entre no prédio ou chegue mais perto da porta para carimbar.": "Entrez dans l'immeuble ou approchez-vous de la porte pour tamponner.",
   "O carimbo não foi deixado. Tente de novo.": "Le tampon n'a pas été laissé. Réessayez.",
+  "Térreo": "Rez-de-chaussée",
+
+  // client/src/ui/floors.ts (seletor de andar)
+  "Andares do escritório": "Étages du bureau",
+  "{0}: agente esperando você": "{0} : agent qui attend votre réponse",
+  "Andar {0}": "Étage {0}",
 };
