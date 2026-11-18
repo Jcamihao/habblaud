@@ -31,7 +31,7 @@ import { hash32 } from '../../shared/hash';
 import { applyPermission } from '../permissions/registry';
 import type { NameStore, StoredCharacter } from './names';
 import { roomDisplayNames } from './rooms';
-import { FloorSlots, floorInfos, floorOf, roomKey } from './floors';
+import { FloorSlots, floorInfos, floorOf, matchTeam, roomKey, teamRoomKey } from './floors';
 import { tr } from '../../shared/i18n';
 import type { WorldMeta } from '../../shared/world/api';
 
@@ -62,6 +62,11 @@ export interface OfficeDeps {
    * projeto. Vazio ou ausente = sem andares (ids e snapshot iguais aos de antes).
    */
   floors?: readonly string[];
+  /**
+   * Pastas filhas de cada andar (ServerConfig.floorProjects). Com elas, a sessão cujo nome casa com uma pasta vai para a
+   * sala dessa pasta (model/floors.ts matchTeam). Ausente ou vazio = sem salas de equipe (igual ao de antes).
+   */
+  floorProjects?: Readonly<Record<string, readonly string[]>>;
   version: string;
   /** Build do cliente servido (ver OfficeSnapshot.meta.build); ausente no modo dev e nos testes. */
   build?: () => string | undefined;
@@ -109,6 +114,8 @@ export interface MainInput {
   account: string;
   sessionId: string;
   cwd: string;
+  /** Nome da sessão (registro do Claude Code, `name`); vale quando o transcript ainda não trouxe um título. */
+  title?: string;
   role: string;
   startedAt: number;
   status: AgentStatus;
@@ -129,6 +136,8 @@ interface AgentRecord {
   info: AgentInfo;
   /** cwd real da sessão principal (a sala pode ser a pasta-mãe, com andares); o "Assumir aqui" retoma nele. */
   cwd?: string;
+  /** Nome da sessão no registro (MainInput.title), guardado para reavaliar a sala quando o título muda. */
+  sessionName?: string;
   history: Activity[];
   removeAt?: number;
   /** Início do turno atual (para "Concluiu em X"). */
@@ -339,7 +348,7 @@ export class Office {
       this.setStatus(p.id, p.status, p.waitingFor);
       return;
     }
-    const roomId = roomKey(p.cwd, this.deps.floors ?? []);
+    const roomId = this.roomFor(p.cwd, p.title);
     this.ensureRoom(roomId, now);
     const chosen = this.roomCharacter(roomId, p.id, p.sessionId);
     // A mesma sessão retomada noutro processo (ex.: "Assumir aqui") mantém o nome, mesmo com o processo antigo
@@ -369,7 +378,7 @@ export class Office {
       if (chosen.parts) info.parts = { ...chosen.parts };
     }
     if (p.status === 'waiting') info.waitingFor = p.waitingFor ?? tr('responder no terminal');
-    const rec: AgentRecord = { info, cwd: p.cwd, history: [] };
+    const rec: AgentRecord = { info, cwd: p.cwd, sessionName: p.title, history: [] };
     if (p.status === 'working') rec.turnStart = now;
     this.agents.set(p.id, rec);
     const acc = this.deps.accountName(p.account);
@@ -699,7 +708,41 @@ export class Office {
       info.lastEventAt = t.lastAt;
       changed = true;
     }
+    if (info.kind === 'main') this.rehome(rec);
     if (changed) this.markDirty();
+  }
+
+  /**
+   * Sala da sessão principal: a equipe pelo título efetivo (título do transcript ?? nome do registro) quando casa com
+   * uma pasta de projeto; senão a sala do cwd (roomKey). Sem floorProjects, é sempre a sala do cwd.
+   */
+  private roomFor(cwd: string, title: string | undefined): string {
+    const floors = this.deps.floors ?? [];
+    const projects = new Map<string, readonly string[]>();
+    for (const floor of floors) {
+      const list = this.deps.floorProjects?.[floor];
+      if (list?.length) projects.set(floor, list);
+    }
+    const team = matchTeam(title, projects);
+    return team ? teamRoomKey(team.floor, team.project) : roomKey(cwd, floors);
+  }
+
+  /**
+   * Reavalia a sala de um principal (o título pode chegar ou mudar depois de addMain). Se a chave mudou, o agente vai
+   * para a sala nova (mesmo id, nome e aparência) junto com os subagentes; a sala antiga some se ficar vazia.
+   */
+  private rehome(rec: AgentRecord): void {
+    const info = rec.info;
+    const target = this.roomFor(rec.cwd ?? info.roomId, info.title ?? rec.sessionName);
+    if (target === info.roomId) return;
+    const from = info.roomId;
+    this.ensureRoom(target, this.now());
+    for (const m of [rec, ...this.descendants(info.id)]) m.info.roomId = target;
+    if (![...this.agents.values()].some((r) => r.info.roomId === from)) {
+      this.rooms.delete(from);
+      this.recomputeRoomNames();
+    }
+    this.markDirty();
   }
 
   /**

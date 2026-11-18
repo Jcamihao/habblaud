@@ -49,6 +49,47 @@ export function roomKey(cwd: string, floors: readonly string[]): string {
   return `${floor}/${first}`;
 }
 
+/** Nome para comparar: sem acento, minúsculas, só a-z0-9 ("Hora H" == "HoraH", "praxis.rh" == "praxisrh"). */
+export function normalizeName(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const TEAM_PREFIX = /^\s*trampo\s+d[oae]s?\s+/i;
+
+/** Tira o prefixo "Trampo do/da/de/dos/das" do título, se houver. */
+export function stripTeamPrefix(title: string): string {
+  return title.replace(TEAM_PREFIX, '').trim();
+}
+
+/** Menor começo de nome que pode casar com uma pasta (abaixo disso, "Tri" casaria com muita coisa). */
+const MIN_PREFIX = 4;
+
+/**
+ * Equipe pelo nome da sessão. Primeiro igualdade exata normalizada: se casar em mais de uma gerência+pasta, é ambíguo
+ * (undefined). Sem igualdade, começo de nome (>= 4 letras) que case com exatamente uma pasta em todas as gerências.
+ * `projects` mapeia andar -> nomes das pastas filhas.
+ */
+export function matchTeam(
+  title: string | undefined,
+  projects: ReadonlyMap<string, readonly string[]>,
+): { floor: string; project: string } | undefined {
+  if (title === undefined) return undefined;
+  const name = normalizeName(stripTeamPrefix(title));
+  if (!name) return undefined;
+  const all: { floor: string; project: string }[] = [];
+  for (const [floor, names] of projects) for (const project of names) all.push({ floor, project });
+  const exact = all.filter((c) => normalizeName(c.project) === name);
+  if (exact.length > 0) return exact.length === 1 ? exact[0] : undefined;
+  if (name.length < MIN_PREFIX) return undefined;
+  const prefix = all.filter((c) => normalizeName(c.project).startsWith(name));
+  return prefix.length === 1 ? prefix[0] : undefined;
+}
+
+/** Sala da equipe: a pasta do projeto dentro da gerência (mesma forma do roomKey). */
+export function teamRoomKey(floor: string, project: string): string {
+  return `${floor}/${project}`;
+}
+
 /** Andares com pelo menos uma sala viva (`alive` traz os caminhos dos andares), na ordem de `floors`, com nome. */
 export function floorInfos(floors: readonly string[], alive: ReadonlySet<string>): { id: string; name: string }[] {
   const shown = floors.filter((f) => alive.has(f));
