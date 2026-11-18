@@ -10,6 +10,7 @@ import {
   copyVolumeArgs,
   type DockerState,
   envFileKeys,
+  floorProjectsEnv,
   hostTimeZone,
   parseArgs,
   planCodexMounts,
@@ -222,5 +223,74 @@ describe('docker-up: migração do nome antigo (CodeTown)', () => {
     expect(msg).toBe('variáveis do nome antigo ignoradas no .env: CODETOWN_BIND → HABBLAUD_BIND, CODETOWN_PORT → HABBLAUD_PORT. Renomeie para valer de novo.');
     expect(msg).not.toContain('0.0.0.0');
     expect(envFileKeys('')).toEqual([]);
+  });
+});
+
+describe('floorProjectsEnv (HABBLAUD_FLOOR_PROJECTS do override)', () => {
+  const fakeScan = (map: Record<string, string[]>) => (floors: readonly string[]) =>
+    Object.fromEntries(floors.map((f) => [f, map[f] ?? []]));
+
+  it('lê HABBLAUD_FLOORS do ambiente e repassa as pastas filhas de cada gerência como JSON', () => {
+    const scan = fakeScan({ '/c/g': ['Agilis', 'Triluga'], '/c/h': [] });
+    expect(floorProjectsEnv({ HABBLAUD_FLOORS: '/c/g, /c/h' }, undefined, scan)).toBe('{"/c/g":["Agilis","Triluga"],"/c/h":[]}');
+  });
+
+  it('sem o ambiente, lê HABBLAUD_FLOORS do texto do .env (aspas, export, comentários e linhas vazias)', () => {
+    const calls: string[][] = [];
+    const scan = (floors: readonly string[]) => {
+      calls.push([...floors]);
+      return Object.fromEntries(floors.map((f) => [f, ['P']]));
+    };
+    const envFile = '# gerências do dono\n\nOUTRA=1\nexport HABBLAUD_FLOORS="/c/g, /c/h"\n# HABBLAUD_FLOORS=/c/x\n';
+    expect(floorProjectsEnv({}, envFile, scan)).toBe('{"/c/g":["P"],"/c/h":["P"]}');
+    expect(calls).toEqual([['/c/g', '/c/h']]);
+    expect(floorProjectsEnv({}, "HABBLAUD_FLOORS='/c/g'\n", scan)).toBe('{"/c/g":["P"]}');
+  });
+
+  it('o ambiente vale mais que o .env (como no Compose)', () => {
+    const calls: string[][] = [];
+    const scan = (floors: readonly string[]) => {
+      calls.push([...floors]);
+      return {};
+    };
+    floorProjectsEnv({ HABBLAUD_FLOORS: '/c/x' }, 'HABBLAUD_FLOORS=/c/g', scan);
+    expect(calls).toEqual([['/c/x']]);
+    // Variável vazia no ambiente também vale: sem gerência, nada é gerado.
+    expect(floorProjectsEnv({ HABBLAUD_FLOORS: '' }, 'HABBLAUD_FLOORS=/c/g', scan)).toBeUndefined();
+  });
+
+  it('sem HABBLAUD_FLOORS em lugar nenhum devolve undefined e não varre pastas', () => {
+    const calls: string[][] = [];
+    const scan = (floors: readonly string[]) => {
+      calls.push([...floors]);
+      return {};
+    };
+    expect(floorProjectsEnv({}, undefined, scan)).toBeUndefined();
+    expect(floorProjectsEnv({ OUTRA: '/c/g' }, 'OUTRA=/c/g\n', scan)).toBeUndefined();
+    expect(floorProjectsEnv({ HABBLAUD_FLOORS: '  ' }, undefined, scan)).toBeUndefined();
+    expect(calls).toEqual([]);
+  });
+
+  it('descarta entradas inválidas (relativas, "/" e repetidas) como o servidor', () => {
+    const calls: string[][] = [];
+    const scan = (floors: readonly string[]) => {
+      calls.push([...floors]);
+      return {};
+    };
+    floorProjectsEnv({ HABBLAUD_FLOORS: 'relativo,/,/c/g,/c/g/' }, undefined, scan);
+    expect(calls).toEqual([['/c/g']]);
+  });
+
+  it('gerência inexistente ou ilegível vira lista vazia, sem falhar', () => {
+    expect(floorProjectsEnv({ HABBLAUD_FLOORS: '/nao/existe' }, undefined, () => {
+      throw new Error('EACCES');
+    })).toBe('{"/nao/existe":[]}');
+  });
+
+  it('renderOverride repassa HABBLAUD_FLOOR_PROJECTS só quando há o JSON', () => {
+    const mounts = planMounts(['/Users/fulano/.claude'], [acc('.claude')], (p) => p);
+    const json = '{"/c/g":["Triluga"]}';
+    expect(renderOverride(mounts, new Date(0), undefined, undefined, [], undefined, [], json)).toContain(`HABBLAUD_FLOOR_PROJECTS: ${JSON.stringify(json)}`);
+    expect(renderOverride(mounts)).not.toContain('HABBLAUD_FLOOR_PROJECTS');
   });
 });

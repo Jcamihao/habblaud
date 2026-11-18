@@ -145,6 +145,14 @@ de valer, e o timelapse do dia mistura ids antigos e novos.
 
 **No Docker**, o valor vai no `.env`, com os caminhos do host. Rode `npm run docker:up` de novo para aplicar.
 
+**Equipes pelo nome da sessão.** Uma sessão chamada `Trampo do Triluga` vai para a sala do projeto `Triluga`, no andar da gerência que tem essa pasta. A regra:
+
+- O prefixo `Trampo do/da/dos/das` é opcional. Maiúsculas, acentos, espaços e pontuação não contam (`Hora H` é igual a `HoraH`).
+- O nome tem de ser igual ao da pasta, ou começar com pelo menos 4 letras dela, e só vale se uma única pasta casar.
+- Se casar com pastas de gerências diferentes, a sessão não muda. Sem casar, fica na sala da pasta onde foi aberta.
+
+No Docker, pasta de projeto nova exige rodar `npm run docker:up` de novo.
+
 ## Instalação
 
 ### Requisitos

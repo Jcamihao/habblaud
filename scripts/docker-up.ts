@@ -12,6 +12,8 @@
 //    credenciais e configurações — e a pasta do uso capturado pelo statusline
 //    (~/.habblaud/usage, criada se faltar) em /usage, também somente leitura. Passa
 //    HABBLAUD_CLAUDE_DIRS, HABBLAUD_ACCOUNTS, HABBLAUD_USAGE_DIR e o fuso do host (TZ) ao container.
+//    HABBLAUD_FLOOR_PROJECTS: as pastas filhas de cada gerência (HABBLAUD_FLOORS, do ambiente ou do .env), lidas
+//    AQUI, no host, porque o servidor no container não enxerga as pastas. Sem gerência, a variável não sai.
 //    Contas do Codex (~/.codex*, CODEX_HOME ou HABBLAUD_CODEX_DIRS; HABBLAUD_CODEX=0 desliga): SOMENTE
 //    sessions/, archived_sessions/ e thread-writer-locks/ de cada uma, somente leitura, em /codex/<conta>/... —
 //    nunca auth.json, config.toml, shell_snapshots/, history.jsonl, logs nem os SQLite. Vão em HABBLAUD_CODEX_DIRS
@@ -44,7 +46,8 @@ import { describeStateMigration, LEGACY_NAME, legacyEnvWarning, migrateLegacySta
 import { makeClaudeRunner, MIN_CLAUDE_VERSION, readPackageVersion, updateInstalledMods, type ModUpdateResult } from './mod-install';
 import { tr } from '../shared/i18n';
 import { readEnvValue } from '../server/remote/envfile';
-import { parseWorldConfig } from '../server/config';
+import { parseWorldConfig, scanFloorProjects } from '../server/config';
+import { parseFloors } from '../server/model/floors';
 import { ensureServerCert, remoteTargets, remoteTlsBase, tlsPaths } from '../server/remote/tls';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -84,7 +87,7 @@ const LEGACY_DOCKER = {
   image: `${LEGACY_NAME}:local`,
 } as const;
 
-const USAGE = tr('Uso: npm run docker:up [-- opções]\n\nOpções:\n  --no-build   sobe sem reconstruir a imagem\n  --down       derruba o container (o mesmo que npm run docker:down)\n  -h, --help   mostra esta ajuda\n\nVariáveis: HABBLAUD_PORT (porta no host, padrão {0}), HABBLAUD_CLAUDE_DIRS\n(config dirs separados por vírgula, se as contas não estiverem em ~/.claude*), HABBLAUD_CODEX_DIRS\n(pastas do Codex, se não estiverem em ~/.codex* nem em CODEX_HOME) e HABBLAUD_CODEX=0 (sem o Codex).', [DEFAULT_PORT]);
+const USAGE = tr('Uso: npm run docker:up [-- opções]\n\nOpções:\n  --no-build   sobe sem reconstruir a imagem\n  --down       derruba o container (o mesmo que npm run docker:down)\n  -h, --help   mostra esta ajuda\n\nVariáveis: HABBLAUD_PORT (porta no host, padrão {0}), HABBLAUD_CLAUDE_DIRS\n(config dirs separados por vírgula, se as contas não estiverem em ~/.claude*), HABBLAUD_CODEX_DIRS\n(pastas do Codex, se não estiverem em ~/.codex* nem em CODEX_HOME), HABBLAUD_CODEX=0 (sem o Codex)\ne HABBLAUD_FLOORS (gerências, do ambiente ou do .env: as pastas de cada uma vão para o container).', [DEFAULT_PORT]);
 
 // ---------------------------------------------------------------------------------------------
 // Saída no terminal
@@ -306,7 +309,7 @@ export function hostTimeZone(env: NodeJS.ProcessEnv = process.env): string | und
 /**
  * `usageDir`: pasta do host com o uso capturado pelo tap de statusline (já existente; caminho real),
  * montada somente leitura em /usage. `timeZone`: fuso do host, repassado como TZ. `codex`: montagens das contas do
- * Codex (planCodexMounts).
+ * Codex (planCodexMounts). `floorProjects`: o JSON de floorProjectsEnv (HABBLAUD_FLOOR_PROJECTS), se houver.
  */
 export function renderOverride(
   mounts: AccountMount[],
@@ -316,6 +319,7 @@ export function renderOverride(
   codex: AccountMount[] = [],
   remoteTlsDir?: string,
   extraPorts: string[] = [],
+  floorProjects?: string,
 ): string {
   const env: Array<[string, string]> = [
     ['HABBLAUD_CLAUDE_DIRS', mounts.map((m) => m.mountDir).join(',')],
@@ -324,6 +328,7 @@ export function renderOverride(
   if (codex.length) env.push(['HABBLAUD_CODEX_DIRS', codex.map((m) => m.mountDir).join(',')]);
   if (usageDir) env.push(['HABBLAUD_USAGE_DIR', CONTAINER_USAGE_DIR]);
   if (timeZone) env.push(['TZ', timeZone]);
+  if (floorProjects) env.push(['HABBLAUD_FLOOR_PROJECTS', floorProjects]);
   const lines = [
     `# Gerado por scripts/docker-up.ts em ${generatedAt.toISOString()} — não edite: é recriado a cada \`npm run docker:up\`.`,
     '# Contém caminhos do host e e-mails das contas: fica fora do git e com permissão 600.',
@@ -444,6 +449,29 @@ export function envFileKeys(text: string): string[] {
     if (m) keys.push(m[1]);
   }
   return keys;
+}
+
+/**
+ * HABBLAUD_FLOOR_PROJECTS para o container: JSON {gerência: [pastas filhas]}, lido no host. A gerência vem de
+ * HABBLAUD_FLOORS do ambiente (vale mais, como no Compose; vazia no ambiente = sem gerência) ou, sem ela, da linha
+ * do .env desta pasta. Sem gerência, undefined: o override sai como antes. Gerência inexistente ou ilegível vira
+ * lista vazia (sem falhar). `scan` é scanFloorProjects; injetável para o teste.
+ */
+export function floorProjectsEnv(
+  env: NodeJS.ProcessEnv,
+  envFileText: string | undefined,
+  scan: (floors: readonly string[]) => Record<string, string[]> = scanFloorProjects,
+): string | undefined {
+  const raw = env.HABBLAUD_FLOORS !== undefined ? env.HABBLAUD_FLOORS : readEnvValue(envFileText ?? '', 'HABBLAUD_FLOORS');
+  const { floors } = parseFloors(raw);
+  if (!floors.length) return undefined;
+  let found: Record<string, string[]> = {};
+  try {
+    found = scan(floors);
+  } catch {
+    // pasta ilegível: segue sem as pastas dela
+  }
+  return JSON.stringify(Object.fromEntries(floors.map((f) => [f, found[f] ?? []])));
 }
 
 /** As variáveis do Habblaud World que o docker-compose.yml repassa ao container. */
@@ -712,8 +740,14 @@ async function up(opts: Options, port: number): Promise<void> {
   if (usageDir) say(tr('Uso ao vivo (mod ou tap de statusline): monta {0} em {1}, somente leitura.', [tildify(USAGE_DIR), CONTAINER_USAGE_DIR]));
   const remoteTlsDir = prepareRemoteTls();
   const remotePorts = remoteTlsDir || remoteInsecure() ? remotePortsToPublish() : [];
+  const floorProjects = floorProjectsEnv(process.env, readEnvFile());
+  if (floorProjects) {
+    const byFloor = JSON.parse(floorProjects) as Record<string, string[]>;
+    const pastas = Object.values(byFloor).flat().length;
+    say(tr('Equipes por nome de sessão: {0} e {1} vão para o container. Projeto novo: rode o npm run docker:up de novo.', [plural(Object.keys(byFloor).length, tr('gerência'), tr('gerências')), plural(pastas, tr('pasta de projeto'), tr('pastas de projeto'))]));
+  }
   const tmp = `${OVERRIDE_FILE}.tmp`;
-  writeFileSync(tmp, renderOverride(mounts, new Date(), usageDir, hostTimeZone(), codexMounts, remoteTlsDir, remotePorts), { mode: 0o600 });
+  writeFileSync(tmp, renderOverride(mounts, new Date(), usageDir, hostTimeZone(), codexMounts, remoteTlsDir, remotePorts, floorProjects), { mode: 0o600 });
   chmodSync(tmp, 0o600);
   renameSync(tmp, OVERRIDE_FILE);
   say(tr('docker-compose.override.yml gerado.'));
