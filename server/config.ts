@@ -1,5 +1,5 @@
 // Configuração do servidor a partir das variáveis de ambiente (documentadas em server/README.md).
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -255,8 +255,17 @@ export function parseFloorProjects(raw: string | undefined): Record<string, stri
   return out;
 }
 
+/** Link simbólico que aponta para uma pasta (link quebrado ou para arquivo: não). */
+function isDirectoryLink(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Pastas filhas diretas de cada andar, do disco: só diretórios, sem nome que começa com '.', em ordem localeCompare.
+ * Pastas filhas diretas de cada andar, do disco: só diretórios (inclusive link para pasta), sem nome que começa com '.', em ordem localeCompare.
  * Andar inexistente ou ilegível = lista vazia (nunca lança).
  */
 export function scanFloorProjects(floors: readonly string[]): Record<string, string[]> {
@@ -265,7 +274,7 @@ export function scanFloorProjects(floors: readonly string[]): Record<string, str
     let names: string[] = [];
     try {
       names = readdirSync(floor, { withFileTypes: true })
-        .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+        .filter((d) => !d.name.startsWith('.') && (d.isDirectory() || (d.isSymbolicLink() && isDirectoryLink(join(floor, d.name)))))
         .map((d) => d.name)
         .sort((a, b) => a.localeCompare(b));
     } catch {

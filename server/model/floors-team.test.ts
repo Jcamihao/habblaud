@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -6,6 +6,7 @@ import { setQuiet } from '../log';
 import { loadConfig, parseFloorProjects, scanFloorProjects } from '../config';
 import { NameStore } from './names';
 import { Office, OFFLINE_GRACE_MS } from './office';
+import { applyChanges, compactSnapshot, diffFrames } from '../../shared/timeline';
 import { matchTeam, normalizeName, stripTeamPrefix, teamRoomKey } from './floors';
 
 setQuiet(true);
@@ -71,6 +72,40 @@ describe('matchTeam', () => {
   it('sem nenhuma gerência com pastas: undefined', () => {
     expect(matchTeam('Trampo do Agilis', new Map())).toBeUndefined();
   });
+
+  it('começo de nome com 4 letras ou mais e um só candidato casa', () => {
+    expect(matchTeam('Trampo do Hora', PROJECTS)).toEqual({ floor: '/c/codeStage', project: 'HoraH' });
+    expect(matchTeam('Selah', PROJECTS)).toEqual({ floor: '/c/codeStage', project: 'SelahIA' });
+  });
+
+  it('começo de nome com mais de um candidato é ambíguo: undefined', () => {
+    // "praxis" é começo de praxis.rh e praxis.psi (e fica com 6 letras, então só a ambiguidade barra).
+    expect(matchTeam('Trampo do praxis', PROJECTS)).toBeUndefined();
+    const two = new Map<string, readonly string[]>([['/c/a', ['Lumen']], ['/c/b', ['Lumenia']]]);
+    expect(matchTeam('Lume', two)).toBeUndefined();
+  });
+
+  it('igualdade exata vence o começo de nome (mesmo havendo outra pasta que começa igual)', () => {
+    const p = new Map<string, readonly string[]>([['/c/a', ['Lumen', 'LumenPro']]]);
+    expect(matchTeam('Trampo do Lumen', p)).toEqual({ floor: '/c/a', project: 'Lumen' });
+  });
+
+  it('o mesmo nome normalizado duas vezes na mesma gerência também é ambíguo', () => {
+    const p = new Map<string, readonly string[]>([['/c/a', ['praxis.rh', 'praxisrh']]]);
+    expect(matchTeam('praxis.rh', p)).toBeUndefined();
+  });
+
+  it('prefixo "Trampo do" só vale no começo e sem nome depois ele não casa nada', () => {
+    expect(matchTeam('Meu Trampo do Agilis', PROJECTS)).toBeUndefined();
+    expect(matchTeam('Trampo do', PROJECTS)).toBeUndefined();
+    expect(matchTeam('Trampo do ', PROJECTS)).toBeUndefined();
+  });
+
+  it('pasta com ponto no fim do nome e título parecido', () => {
+    const p = new Map<string, readonly string[]>([['/c/a', ['praxis.']]]);
+    expect(matchTeam('Trampo do praxis', p)).toEqual({ floor: '/c/a', project: 'praxis.' });
+    expect(matchTeam('praxis.', p)).toEqual({ floor: '/c/a', project: 'praxis.' });
+  });
 });
 
 describe('teamRoomKey', () => {
@@ -93,6 +128,14 @@ describe('parseFloorProjects', () => {
     expect(parseFloorProjects('   ')).toEqual({});
   });
 
+  it('nomes com ponto ficam como estão (praxis.rh, praxis.)', () => {
+    expect(parseFloorProjects('{"/c/praxis.":["praxis.rh","praxis."]}')).toEqual({ '/c/praxis.': ['praxis.rh', 'praxis.'] });
+  });
+
+  it('a chave do andar é normalizada (barra no fim)', () => {
+    expect(parseFloorProjects('{"/c/g/":["A"]}')).toEqual({ '/c/g': ['A'] });
+  });
+
   it('descarta valores que não são lista de nomes', () => {
     expect(parseFloorProjects('{"/c/g":["A",3,""],"/c/h":"x"}')).toEqual({ '/c/g': ['A'] });
   });
@@ -112,6 +155,24 @@ describe('scanFloorProjects', () => {
     mkdirSync(join(g, '.oculta'));
     writeFileSync(join(g, 'arquivo.txt'), 'x');
     expect(scanFloorProjects([g])).toEqual({ [g]: ['Agilis', 'Triluga'] });
+  });
+
+  it('link simbólico para pasta conta; para arquivo ou quebrado, não', () => {
+    const g = join(root, 'g');
+    mkdirSync(join(g, 'Real'), { recursive: true });
+    mkdirSync(join(root, 'fora'));
+    writeFileSync(join(root, 'arq.txt'), 'x');
+    symlinkSync(join(root, 'fora'), join(g, 'Atalho'));
+    symlinkSync(join(root, 'arq.txt'), join(g, 'ArquivoLink'));
+    symlinkSync(join(root, 'nada'), join(g, 'Quebrado'));
+    expect(scanFloorProjects([g])).toEqual({ [g]: ['Atalho', 'Real'] });
+  });
+
+  it('nomes com ponto (praxis.rh, praxis.) são pastas como as outras', () => {
+    const g = join(root, 'g');
+    mkdirSync(join(g, 'praxis.rh'), { recursive: true });
+    mkdirSync(join(g, 'praxis.'));
+    expect(scanFloorProjects([g])[g]).toEqual(['praxis.', 'praxis.rh']);
   });
 
   it('pasta inexistente: lista vazia, sem lançar', () => {
@@ -245,6 +306,162 @@ describe('Office: sala do projeto pelo nome da sessão', () => {
     const { office, now } = makeOffice({});
     office.addMain(main('acc:1', 's1', '/c/codeStage', now(), 'Trampo do Agilis'));
     expect(office.get('acc:1')!.roomId).toBe('/c/codeStage');
+  });
+});
+
+describe('Office: reavaliação da sala ao vivo (rehome)', () => {
+  it('equipe -> outra equipe -> título que não casa (volta à sala do cwd); a sala vazia some a cada passo', () => {
+    const { office, now } = makeOffice(FLOOR_PROJECTS);
+    office.addMain(main('acc:1', 's1', '/c/codeStage/Triluga/app', now()));
+    expect(office.get('acc:1')!.roomId).toBe('/c/codeStage/Triluga');
+    office.applyTranscript('acc:1', emptyTranscript('Trampo do Agilis'));
+    expect(office.get('acc:1')!.roomId).toBe('/c/codeStage/Agilis');
+    expect(office.commit().snapshot.rooms.map((r) => r.id)).toEqual(['/c/codeStage/Agilis']);
+    office.applyTranscript('acc:1', emptyTranscript('Trampo do Lumen'));
+    expect(office.commit().snapshot.rooms.map((r) => r.id)).toEqual(['/c/codeStage/Lumen']);
+    office.applyTranscript('acc:1', emptyTranscript('Refatorando o login'));
+    const snap = office.commit().snapshot;
+    expect(office.get('acc:1')!.roomId).toBe('/c/codeStage/Triluga');
+    expect(snap.rooms.map((r) => r.id)).toEqual(['/c/codeStage/Triluga']);
+    expect(snap.agents.filter((a) => a.id === 'acc:1')).toHaveLength(1);
+  });
+
+  it('o andar vem do snapshot: sai o andar que ficou sem sala, entra o da sala nova', () => {
+    const { office, now } = makeOffice(FLOOR_PROJECTS);
+    office.addMain(main('acc:1', 's1', '/c/praxis.', now()));
+    expect(office.commit().snapshot.floors).toEqual([{ id: '/c/praxis.', name: 'praxis.' }]);
+    office.applyTranscript('acc:1', emptyTranscript('Trampo do Agilis'));
+    const snap = office.commit().snapshot;
+    expect(snap.floors).toEqual([{ id: '/c/codeStage', name: 'codeStage' }]);
+    expect(snap.rooms).toMatchObject([{ id: '/c/codeStage/Agilis', floor: '/c/codeStage' }]);
+  });
+
+  it('a sala velha continua se ainda tem alguém (outra sessão do cwd)', () => {
+    const { office, now } = makeOffice(FLOOR_PROJECTS);
+    office.addMain(main('acc:1', 's1', '/c/codeStage', now()));
+    office.addMain(main('acc:2', 's2', '/c/codeStage', now()));
+    office.applyTranscript('acc:1', emptyTranscript('Trampo do Agilis'));
+    expect(office.commit().snapshot.rooms.map((r) => r.id).sort()).toEqual(['/c/codeStage', '/c/codeStage/Agilis']);
+    expect(office.get('acc:2')!.roomId).toBe('/c/codeStage');
+  });
+
+  it('neto (sub de sub) também acompanha; sub que chega depois nasce na sala nova; roomPath é a pasta real', () => {
+    const { office, now } = makeOffice(FLOOR_PROJECTS);
+    office.addMain(main('acc:1', 's1', '/c/codeStage', now()));
+    office.addSub({ id: 's1:a', parentId: 'acc:1', sessionId: 's1', role: 'Explore', background: false, startedAt: now() });
+    office.addSub({ id: 's1:b', parentId: 's1:a', sessionId: 's1', role: 'Explore', background: false, startedAt: now() });
+    office.applyTranscript('acc:1', emptyTranscript('Trampo do Lumen'));
+    expect(office.get('s1:a')!.roomId).toBe('/c/codeStage/Lumen');
+    expect(office.get('s1:b')!.roomId).toBe('/c/codeStage/Lumen');
+    office.addSub({ id: 's1:c', parentId: 'acc:1', sessionId: 's1', role: 'Explore', background: false, startedAt: now() });
+    expect(office.get('s1:c')!.roomId).toBe('/c/codeStage/Lumen');
+    expect(office.roomPath('/c/codeStage/Lumen')).toBe('/c/codeStage/Lumen');
+    expect(office.roomName('/c/codeStage/Lumen')).toBe('Lumen');
+  });
+
+  it('o nome do registro vale sem título do transcript; o título do transcript manda quando existe', () => {
+    const { office, now } = makeOffice(FLOOR_PROJECTS);
+    office.addMain(main('acc:1', 's1', '/c/codeStage', now(), 'Trampo do Agilis'));
+    // transcript com um título que não casa: manda o do transcript, a sessão volta ao cwd
+    office.applyTranscript('acc:1', emptyTranscript('Ajustes diversos'));
+    expect(office.get('acc:1')!.roomId).toBe('/c/codeStage');
+    // transcript sem título (ex.: /clear): volta a valer o nome do registro
+    office.applyTranscript('acc:1', emptyTranscript());
+    expect(office.get('acc:1')!.roomId).toBe('/c/codeStage/Agilis');
+  });
+
+  it('nome do registro que muda com a sessão viva reavalia a sala (setSessionName), sem recriar o agente', () => {
+    const { office, now } = makeOffice(FLOOR_PROJECTS);
+    office.addMain(main('acc:1', 's1', '/c/codeStage', now(), 'codestage-9a'));
+    office.addSub({ id: 's1:a', parentId: 'acc:1', sessionId: 's1', role: 'Explore', background: false, startedAt: now() });
+    const before = office.get('acc:1')!;
+    const { name, seed } = before;
+    expect(before.roomId).toBe('/c/codeStage');
+    office.setSessionName('acc:1', 'Trampo do Agilis');
+    expect(office.get('acc:1')).toMatchObject({ roomId: '/c/codeStage/Agilis', name, seed });
+    expect(office.get('s1:a')!.roomId).toBe('/c/codeStage/Agilis');
+    office.setSessionName('acc:1', 'Trampo do Lumen');
+    expect(office.get('acc:1')!.roomId).toBe('/c/codeStage/Lumen');
+    office.setSessionName('acc:1', undefined);
+    expect(office.get('acc:1')!.roomId).toBe('/c/codeStage');
+    expect(office.commit().snapshot.rooms.map((r) => r.id)).toEqual(['/c/codeStage']);
+  });
+
+  it('personagem salvo: quem se muda não toca no personagem da sala nova e o da antiga continua guardado', () => {
+    const names = new NameStore(null);
+    let clock = 1_000_000;
+    const office = new Office({
+      names,
+      version: 't',
+      startedAt: clock,
+      accounts: () => [],
+      sources: () => [],
+      accountName: () => undefined,
+      now: () => clock,
+      floors: FLOORS,
+      floorProjects: FLOOR_PROJECTS,
+    });
+    // a sala de Agilis já tem personagem de OUTRA sessão (dona s9)
+    names.setCharacter('/c/codeStage/Agilis', { name: 'Ana', look: 'f', seed: 7, owner: 's9' });
+    // s1 tem personagem na sala do andar
+    office.addMain(main('acc:1', 's1', '/c/codeStage', clock));
+    expect(office.setCharacter('acc:1', { name: 'Zé', seed: 3, parts: {} }).result).toBe('ok');
+    expect(office.get('acc:1')!.custom).toBe(true);
+
+    office.applyTranscript('acc:1', emptyTranscript('Trampo do Agilis'));
+    const moved = office.get('acc:1')!;
+    expect(moved).toMatchObject({ roomId: '/c/codeStage/Agilis', name: 'Zé' });
+    // continua com o nome, mas já não é "o personagem da sala": "voltar ao sorteio" não mexe no da sala nova
+    expect(moved.custom).toBeUndefined();
+    expect(office.resetCharacter('acc:1')).toBe('ok');
+    expect(names.character('/c/codeStage/Agilis')).toMatchObject({ name: 'Ana', owner: 's9' });
+    // o personagem da sala antiga segue guardado (dono s1)
+    expect(names.character('/c/codeStage')).toMatchObject({ name: 'Zé', owner: 's1' });
+  });
+
+  it('quem chega na sala da equipe pega o personagem salvo dela (a sessão que se mudou não o rouba)', () => {
+    const names = new NameStore(null);
+    const clock = 1_000_000;
+    const office = new Office({
+      names, version: 't', startedAt: clock, accounts: () => [], sources: () => [], accountName: () => undefined,
+      now: () => clock, floors: FLOORS, floorProjects: FLOOR_PROJECTS,
+    });
+    names.setCharacter('/c/codeStage/Agilis', { name: 'Ana', look: 'f', seed: 7, owner: 's9' });
+    office.addMain(main('acc:1', 's1', '/c/codeStage', clock));
+    const own = office.get('acc:1')!.name;
+    office.applyTranscript('acc:1', emptyTranscript('Trampo do Agilis'));
+    expect(office.get('acc:1')!.name).toBe(own);
+    // a dona volta: recebe o personagem da sala
+    office.addMain(main('acc:2', 's9', '/c/codeStage/Agilis', clock));
+    expect(office.get('acc:2')!.name).toBe('Ana');
+  });
+
+  it('timeline: o quadro antes e depois da mudança de sala se reconstrói pelo diff (sala velha sai, agente troca de sala)', () => {
+    const { office, now } = makeOffice(FLOOR_PROJECTS);
+    office.addMain(main('acc:1', 's1', '/c/codeStage', now()));
+    const prev = compactSnapshot(office.commit().snapshot);
+    office.applyTranscript('acc:1', emptyTranscript('Trampo do Agilis'));
+    const next = compactSnapshot(office.commit().snapshot);
+    const d = diffFrames(prev, next);
+    expect(d).not.toBeNull();
+    applyChanges(prev, d!);
+    expect([...prev.rooms.keys()]).toEqual(['/c/codeStage/Agilis']);
+    expect(prev.agents.get('acc:1')!.roomId).toBe('/c/codeStage/Agilis');
+  });
+
+  it('efeito (festa/alarme) fica na sala onde o evento ocorreu; depois da mudança, o evento novo vale na sala nova', () => {
+    const { office, now } = makeOffice(FLOOR_PROJECTS);
+    office.addMain(main('acc:1', 's1', '/c/codeStage', now()));
+    office.addMain(main('acc:2', 's2', '/c/codeStage', now()));
+    office.githubEvent('acc:1', { kind: 'pr_merged', number: 1 }, { key: 'k1', at: now() });
+    expect(office.commit().snapshot.rooms.find((r) => r.id === '/c/codeStage')?.effect?.kind).toBe('party');
+    office.applyTranscript('acc:1', emptyTranscript('Trampo do Agilis'));
+    const snap = office.commit().snapshot;
+    // a sala antiga continua (acc:2) com a festa dela; a nova começa limpa
+    expect(snap.rooms.find((r) => r.id === '/c/codeStage')?.effect?.kind).toBe('party');
+    expect(snap.rooms.find((r) => r.id === '/c/codeStage/Agilis')?.effect).toBeUndefined();
+    office.githubEvent('acc:1', { kind: 'ci_failed', number: 2 }, { key: 'k2', at: now() });
+    expect(office.commit().snapshot.rooms.find((r) => r.id === '/c/codeStage/Agilis')?.effect?.kind).toBe('alarm');
   });
 });
 

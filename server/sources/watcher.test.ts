@@ -14,7 +14,7 @@ setQuiet(true);
 
 const CWD = '/projetos/loja';
 
-function setup(opts: { tailBytes?: number } = {}) {
+function setup(opts: { tailBytes?: number; floors?: string[]; floorProjects?: Record<string, string[]> } = {}) {
   const tmp = tempDir();
   const home = tmp.dir;
   const dir = join(home, '.claude');
@@ -38,6 +38,8 @@ function setup(opts: { tailBytes?: number } = {}) {
     sources: () => [],
     accountName: (id) => accounts.find(id)?.detected.name,
     now,
+    ...(opts.floors ? { floors: opts.floors } : {}),
+    ...(opts.floorProjects ? { floorProjects: opts.floorProjects } : {}),
   });
   late.office = office;
   const alive = new Set<number>();
@@ -742,5 +744,39 @@ describe('ClaudeWatcher — shell lançado no começo de um transcript maior que
       c.watcher.stop();
       c.tmp.cleanup();
     }
+  });
+});
+
+describe('ClaudeWatcher: sala de equipe pelo nome da sessão', () => {
+  let c: Ctx;
+  beforeEach(() => {
+    c = setup({ floors: ['/g'], floorProjects: { '/g': ['Agilis', 'Lumen'] } });
+  });
+  afterEach(() => {
+    c.watcher.stop();
+    c.tmp.cleanup();
+  });
+
+  it('nome do registro que muda com a sessão viva move o agente; título do transcript tem prioridade e também move', () => {
+    const id = '.claude:100';
+    c.openSession(100, 'sess-a', { cwd: '/g', name: 'codestage-9a' });
+    c.poll();
+    expect(c.agent(id)!.roomId).toBe('/g');
+
+    // renomeou: o registro é regravado com o nome novo (sem nenhum transcript ainda)
+    c.openSession(100, 'sess-a', { cwd: '/g', name: 'Trampo do Agilis' });
+    c.poll();
+    expect(c.agent(id)!.roomId).toBe('/g/Agilis');
+    expect(c.office.commit().snapshot.rooms.map((r) => r.id)).toEqual(['/g/Agilis']);
+
+    // o transcript traz o título (custom-title) e ele manda
+    mkdirSync(join(c.dir, 'projects', encodeCwd('/g')), { recursive: true });
+    writeLines(join(c.dir, 'projects', encodeCwd('/g'), 'sess-a.jsonl'), [L.raw('custom-title', { customTitle: 'Trampo do Lumen' }), L.prompt('oi', { at: c.now() })]);
+    c.advance(4_000);
+    c.poll();
+    expect(c.agent(id)!.roomId).toBe('/g/Lumen');
+    expect(c.office.commit().snapshot.rooms.map((r) => r.id)).toEqual(['/g/Lumen']);
+    // mesmo id, sem duplicar
+    expect(c.agents().filter((a) => a.kind === 'main')).toHaveLength(1);
   });
 });

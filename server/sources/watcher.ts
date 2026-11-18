@@ -329,6 +329,8 @@ export class ClaudeWatcher implements AgentSource {
       t = fresh;
     }
     t.entry = entry;
+    // O nome da sessão no registro pode mudar com ela viva (renomear): a sala de equipe é reavaliada.
+    office.setSessionName(key, entry.name);
     this.pumpMain(t);
     this.scanSubagents(t, boot);
     this.pumpSubs(t);

@@ -713,6 +713,17 @@ export class Office {
   }
 
   /**
+   * O nome da sessão no registro do Claude Code mudou (ou sumiu): guarda e reavalia a sala. O título do transcript, quando
+   * existe, continua mandando (rehome usa `info.title ?? sessionName`); aqui só vale para quem ainda não tem um.
+   */
+  setSessionName(id: string, name: string | undefined): void {
+    const rec = this.agents.get(id);
+    if (!rec || rec.info.kind !== 'main' || rec.sessionName === name) return;
+    rec.sessionName = name;
+    this.rehome(rec);
+  }
+
+  /**
    * Sala da sessão principal: a equipe pelo título efetivo (título do transcript ?? nome do registro) quando casa com
    * uma pasta de projeto; senão a sala do cwd (roomKey). Sem floorProjects, é sempre a sala do cwd.
    */
@@ -737,6 +748,13 @@ export class Office {
     if (target === info.roomId) return;
     const from = info.roomId;
     this.ensureRoom(target, this.now());
+    // O personagem escolhido pertence à sala antiga (e fica guardado lá, com a sessão como dona). Em vez de deixar o
+    // "custom" apontar para a sala nova (onde "Voltar ao sorteio" e o /clear mexeriam no personagem de outra pessoa),
+    // o agente segue com o mesmo nome e visual, agora como o da sessão dele.
+    if (info.custom) {
+      this.deps.names.remember(info.sessionId, { name: info.name, look: info.look });
+      delete info.custom;
+    }
     for (const m of [rec, ...this.descendants(info.id)]) m.info.roomId = target;
     if (![...this.agents.values()].some((r) => r.info.roomId === from)) {
       this.rooms.delete(from);
