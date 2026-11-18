@@ -11,14 +11,14 @@ O dono usa o Habblaud para acompanhar os próprios agentes em várias pastas ao 
 ## 2. Repositório
 
 - Caminho local: `/home/caminhao/habblaud`.
-- Remoto: `origin` = `https://github.com/marmottajr/habblaud.git` (do `marmottajr`; sem permissão de escrita para a conta do dono). Branch de produção: `main` (pública, tags de release). Branch de integração: `develop`, criada a partir da `main` em 2026-11-18 por decisão do dono (fluxo `feat/fix` -> `develop` -> `main`; o merge da `develop` na `main` só quando o dono pedir).
+- Remotos: `origin` = fork do dono (`git@github.com:Jcamihao/habblaud.git`); `upstream` = `https://github.com/marmottajr/habblaud.git` (original, só leitura). Branch de produção: `main` (pública, tags de release). Branch de integração: `develop`, criada a partir da `main` em 2026-11-18 por decisão do dono (fluxo `feat/fix` -> `develop` -> `main`; o merge da `develop` na `main` só quando o dono pedir).
 - Commits: mensagem em português, corpo curto explicando o porquê, e a linha `Co-Authored-By` ao final. Caminhos explícitos no `git add`; nunca `git add -A`, nunca amend nem reset de commit já feito.
 - Último release na `main`: v1.0.3.
 
 **Branch de trabalho**
 
 - Branch atual: `develop` (a feature `feature/andares-por-gerencia`, base `main` no commit `faa1a01`, foi mergeada nela com `--no-ff`; a branch da feature foi apagada). Próximas tarefas: abrir `feat/<nome>` ou `fix/<nome>` a partir da `develop`.
-- No remoto: **nada foi enviado**. A `develop` existe só localmente. O push falhou porque o `origin` (`marmottajr/habblaud`) não é do dono: a conta `gh` dele (`Jcamihao`) tem só permissão de leitura nele, e o Git não tem credencial de HTTPS. A `main` do remoto não mudou (v1.0.3). Caminhos possíveis, a decidir pelo dono: fazer um fork na conta dele e apontar o `origin` para lá, ou usar as credenciais de quem tem acesso ao `marmottajr/habblaud`.
+- No remoto: a `develop` foi enviada ao **fork do dono** (`origin` = `git@github.com:Jcamihao/habblaud.git`, criado em 2026-11-18). O `upstream` é o repositório original `marmottajr/habblaud`, onde a conta do dono só tem leitura; a `main` local rastreia `upstream/main` (v1.0.3, sem a feature). O CI do repositório roda só em push na `main` e em pull request, sem deploy.
 - Merge na `main`: **aguardando pedido explícito do dono**. Ao pedir: `git merge --no-ff` da `develop`, testes, bump de versão (minor, sugerido 1.1.0), tag anotada `vX.Y.Z`, push da `main` e da tag. Deploy só com pedido explícito.
 - Estado do git: árvore limpa, exceto `CLAUDE.md`, modificado pelo `graphify claude install` (+10 linhas). Essa modificação não deve entrar em commit sem o dono pedir.
 - Commits da feature (do mais antigo): spec e plano (`40b974c`, `a11e078`), funções de andar (`87a29c3`, `876a005`), escritório publica andar (`c453847`, `c45d94b`), teste do World (`e92b24e`), lógica do cliente (`37622e5`, `aeb5136`), `floorTabs` para a UI (`b7c9678`), mundo mostra um andar (`2bfa7ef`, `c1d19da`), seletor e lista lateral (`a72ebcc`, `4b6be42`), documentação e handoff (`6c37735`, `684a651`), correção visual do seletor (`6cb1d85`).
@@ -61,8 +61,7 @@ O dono usa o Habblaud para acompanhar os próprios agentes em várias pastas ao 
 
 1. O dono abrir sessões dentro das pastas das gerências e conferir os andares com os agentes reais.
 2. Quando o dono pedir: merge da `develop` na `main`, versão 1.1.0 e tag (passos na seção 2).
-3. Resolver onde fazer o push da `develop` (fork ou credenciais; ver seção 2).
-4. Itens da seção 9 que o dono ainda decide.
+3. Itens da seção 9 que o dono ainda decide.
 
 ## 8. Desafios e riscos
 
