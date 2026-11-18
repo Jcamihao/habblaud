@@ -1,6 +1,6 @@
 # Handoff do Habblaud
 
-Este arquivo permite que outra pessoa ou outra IA continue o trabalho sem depender da conversa em que ele foi feito. Última atualização: 2026-11-16, na branch `feature/andares-por-gerencia`.
+Este arquivo permite que outra pessoa ou outra IA continue o trabalho sem depender da conversa em que ele foi feito. Última atualização: 2026-11-18, depois do merge da feature dos andares na `develop`.
 
 ## 1. Projeto
 
@@ -11,18 +11,17 @@ O dono usa o Habblaud para acompanhar os próprios agentes em várias pastas ao 
 ## 2. Repositório
 
 - Caminho local: `/home/caminhao/habblaud`.
-- Remoto: `origin` = `https://github.com/marmottajr/habblaud.git`. Branch principal: `main`.
+- Remoto: `origin` = `https://github.com/marmottajr/habblaud.git`. Branch de produção: `main` (pública, tags de release). Branch de integração: `develop`, criada a partir da `main` em 2026-11-18 por decisão do dono (fluxo `feat/fix` -> `develop` -> `main`; o merge da `develop` na `main` só quando o dono pedir).
 - Commits: mensagem em português, corpo curto explicando o porquê, e a linha `Co-Authored-By` ao final. Caminhos explícitos no `git add`; nunca `git add -A`, nunca amend nem reset de commit já feito.
 - Último release na `main`: v1.0.3.
 
 **Branch de trabalho**
 
-- Branch atual: `feature/andares-por-gerencia`.
-- Tipo: feature. Base: `main` (commit `faa1a01`).
-- No remoto: ainda não (nenhum push feito).
-- Merge: aguardando a conferência final e a aprovação do dono. Não fazer merge, tag nem push da `main` sem ela.
-- Estado do git: árvore limpa, exceto `CLAUDE.md`, modificado pelo `graphify claude install` (+10 linhas). Essa modificação não deve entrar em commit da feature sem o dono pedir.
-- Commits da feature (do mais antigo): spec e plano (`40b974c`, `a11e078`), funções de andar (`87a29c3`, `876a005`), escritório publica andar (`c453847`, `c45d94b`), teste do World (`e92b24e`), lógica do cliente (`37622e5`, `aeb5136`), `floorTabs` para a UI (`b7c9678`), mundo mostra um andar (`2bfa7ef`, `c1d19da`), seletor e lista lateral (`a72ebcc`, `4b6be42`), documentação (ver `git log`).
+- Branch atual: `develop` (a feature `feature/andares-por-gerencia`, base `main` no commit `faa1a01`, foi mergeada nela com `--no-ff`; a branch da feature foi apagada). Próximas tarefas: abrir `feat/<nome>` ou `fix/<nome>` a partir da `develop`.
+- No remoto: a `develop` foi enviada; a `main` não mudou (continua na v1.0.3, sem a feature).
+- Merge na `main`: **aguardando pedido explícito do dono**. Ao pedir: `git merge --no-ff` da `develop`, testes, bump de versão (minor, sugerido 1.1.0), tag anotada `vX.Y.Z`, push da `main` e da tag. Deploy só com pedido explícito.
+- Estado do git: árvore limpa, exceto `CLAUDE.md`, modificado pelo `graphify claude install` (+10 linhas). Essa modificação não deve entrar em commit sem o dono pedir.
+- Commits da feature (do mais antigo): spec e plano (`40b974c`, `a11e078`), funções de andar (`87a29c3`, `876a005`), escritório publica andar (`c453847`, `c45d94b`), teste do World (`e92b24e`), lógica do cliente (`37622e5`, `aeb5136`), `floorTabs` para a UI (`b7c9678`), mundo mostra um andar (`2bfa7ef`, `c1d19da`), seletor e lista lateral (`a72ebcc`, `4b6be42`), documentação e handoff (`6c37735`, `684a651`), correção visual do seletor (`6cb1d85`).
 
 ## 3. Stack
 
@@ -38,8 +37,9 @@ O dono usa o Habblaud para acompanhar os próprios agentes em várias pastas ao 
 - Desenvolvimento: `npm run dev` (servidor) e `npm run demo` (dados fictícios; capturas de tela com `?mock=1`).
 - **Use Node 24 nos comandos de teste**: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH`. O shell padrão da máquina é Node 20, onde `WebSocket` global não existe e quase 50 testes de `server/world` falham por isso.
 - Gate: `npm run typecheck`, `npm test`, `npm run build`, `npm run i18n:check`. Não existe script de lint.
-- Números verdes mais recentes (Node 24, em 2026-11-16): `npx vitest run client shared server/model` = 1111 testes passando; `i18n:check` = 2987/2987 em en, es e fr; typecheck e build verdes. **Falha conhecida e anterior à feature**: `server/world/uplink.test.ts`, caso "o tema e as opções do jogador" (espera `tema`); falha também no commit pai. Não foi investigada.
-- Armadilha: o container já caiu uma vez sem erro nos logs (código 127). Basta `docker start habblaud`; a política é `unless-stopped`.
+- Números verdes mais recentes (Node 24, em 2026-11-18): `npm test` = 1966 passando e 1 falha; `npx vitest run client shared server/model` = 1112 passando; `i18n:check` = 2987/2987 em en, es e fr; typecheck e build verdes. **Falha conhecida e anterior à feature**: `server/world/uplink.test.ts`, caso "o tema e as opções do jogador" (espera `tema`); falha também no commit pai. Não foi investigada.
+- Armadilha: o container saiu com código 127, sem erro nos logs, duas vezes (a 2ª depois de a máquina ficar desligada). Basta `docker start habblaud` (ou `npm run docker:up` para reconstruir); a política é `unless-stopped`.
+- Para testar andares sem mexer no Habblaud real: transcripts fictícios em uma pasta temporária (`projects/<cwd com - no lugar de / e .>/<sessão>.jsonl`), um `sessions/<pid>.json` por sessão com um `pid` vivo (ex.: `sleep 3000`), e uma segunda instância (`node dist/server/index.js`) com `HABBLAUD_PORT=4748`, `HABBLAUD_CLAUDE_DIRS`, `HABBLAUD_DATA_DIR`, `HABBLAUD_USAGE_DIR`, `HABBLAUD_FLOORS`, `HABBLAUD_WORLD=0`, `HABBLAUD_TIMELINE=0`, `HABBLAUD_CODEX=0`. Capturas com `playwright-core` e o Chromium em `~/.cache/ms-playwright`.
 
 ## 5. Planos
 
@@ -50,17 +50,18 @@ O dono usa o Habblaud para acompanhar os próprios agentes em várias pastas ao 
 
 ## 6. Onde parou
 
-- Código da feature completo e revisado por subagentes; falta a **conferência final (Tarefa 8)**: ler o diff inteiro, rodar tudo uma vez, subir o Habblaud de verdade com `HABBLAUD_FLOORS` e olhar no navegador.
-- O container em execução ainda é o da versão 1.0.3, sem a feature. Subir a feature reinicia o container; avisar o dono antes.
+- Feature completa, revisada por subagentes e conferida pelo agente principal (testes, build, integração real). Mergeada na `develop`; a `main` ainda não a tem.
+- O container do dono foi reconstruído em 2026-11-18 a partir da feature, com `HABBLAUD_FLOORS=/home/caminhao/coding/codeStage,/home/caminhao/coding/praxis.` no `.env`. Hoje o servidor só vê sessões em `/home/caminhao/codeStage` (pasta antiga, de root) e `/home/caminhao/coding`, então nenhum andar aparece até o dono abrir sessões dentro de `coding/codeStage/<projeto>` ou `coding/praxis./<projeto>`.
+- Verificado no navegador (Chromium headless, instância de teste com 6 sessões fictícias): o seletor aparece, as contagens batem, cada clique troca de andar e ativa o botão, a sala de subpasta cai na sala da pasta filha, nenhum erro no console, layout largo (1280px) e estreito (560px). Duas falhas visuais achadas aí foram corrigidas em `6cb1d85` (o seletor cobria o rótulo da cozinha; a contagem do andar ativo sumia).
 - Backend: `server/model/floors.ts` (`parseFloors`, `floorOf`, `roomKey`, `floorInfos`, `FloorSlots`), `Office` publica `RoomInfo.floor` e `OfficeSnapshot.floors`, vagas por andar, o timelapse guarda o andar.
 - Cliente: `client/src/world/floor.ts` (lógica pura), `createWorld` com `floor()`, `setFloor()`, `onFloor()`, `client/src/ui/floors.ts` (seletor, fixo sob a barra do topo, escondido na cidade), `client/src/ui/floor-tabs.ts` (contagens), lista lateral ordenada por andar com etiqueta.
-- **Não verificado** (só o navegador confirma): pintura real e enquadramento da câmera ao trocar de andar; seletor em janela estreita e com a linha de uso aberta; arrastar sala entre andares (deve recusar); troca de andar ao clicar em agente de outro andar; timelapse com andares; moedinhas de agentes de andar escondido; o que acontece com sessões Codex em `/home/caminhao/codeStage` (pasta antiga, de root, fora de `coding`).
+- **Não verificado**: arrastar sala entre andares (o código deve recusar; não foi testado no navegador); clicar em agente de outro andar na lista lateral (troca de andar e foco); timelapse com andares; seletor com a linha de uso da conta aberta (a barra do topo cresce); moedinhas de agentes de andar escondido; sessões Codex em `/home/caminhao/codeStage`; o seletor com o Habblaud em PT (as capturas saíram em inglês, pelo idioma do navegador de teste).
 
 ## 7. O que falta
 
-1. Tarefa 8: conferência final e integração real (acima).
-2. Perguntar ao dono, em frases completas, se aprova o merge na `main`.
-3. Depois do "aprovo": `git merge --no-ff`, testes na `main`, bump de versão (minor: funcionalidade nova, sugerido 1.1.0), tag anotada, push da `main` e da tag. Deploy só com pedido explícito.
+1. O dono abrir sessões dentro das pastas das gerências e conferir os andares com os agentes reais.
+2. Quando o dono pedir: merge da `develop` na `main`, versão 1.1.0 e tag (passos na seção 2).
+3. Itens da seção 9 que o dono ainda decide.
 
 ## 8. Desafios e riscos
 
@@ -73,14 +74,14 @@ O dono usa o Habblaud para acompanhar os próprios agentes em várias pastas ao 
 
 ## 9. Decisões abertas do dono
 
-- Aprovar ou não o merge da feature na `main` (e a versão, sugerida 1.1.0).
+- Quando levar a `develop` para a `main` (e a versão, sugerida 1.1.0).
 - Se a pasta antiga `/home/caminhao/codeStage` deve entrar na lista de gerências.
 - Se o limite do timelapse acima merece correção antes do merge.
 - Se o `CLAUDE.md` com a seção do graphify deve ser commitado no repositório (é público, MIT).
 
 ## 10. Regras do dono e convenções
 
-- Feature em branch `feature/<nome>`, correção em `fix/<nome>`; nunca commit direto na `main`; merge só com aprovação do dono.
+- Fluxo (regra do dono de 2026-11-18): tarefa nova abre `feat/<nome>` (bug: `fix/<nome>`) a partir da `develop`; pronta e verde, merge `--no-ff` na `develop` e apaga a branch, sem pedir aprovação; nunca commit direto na `develop` nem na `main`; merge da `develop` na `main` só quando o dono pedir.
 - Nunca push forçado; nunca segredo, `.env` ou log de subagente em commit; deploy e qualquer ação em servidor só com pedido explícito.
 - Todo texto visível em `tr('PT')` com traduções; toda mudança visível em "Não lançado" do `CHANGELOG.md`.
 - Subagentes: um por vez; quem desenvolve usa o modelo haiku, quem revisa e corrige usa sonnet; o agente principal confere por amostra (diff, testes, integração real) antes de dar como pronto.
