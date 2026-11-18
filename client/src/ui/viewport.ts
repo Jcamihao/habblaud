@@ -13,6 +13,8 @@ import type { Selection, ViewInsets, WorldApi } from '../world/api';
 
 /** Folga entre a borda do painel e o conteúdo enquadrado (px CSS). */
 export const INSET_GAP = 8;
+/** Folga entre o seletor de andar e a barra superior (px CSS); o seletor ocupa a altura dele mais esta folga. */
+export const FLOORS_GAP = 4;
 /** Janela do duplo clique: a gaveta aberta pelo 1º clique só muda o enquadramento depois dela. */
 export const DBLCLICK_GUARD_MS = 380;
 /** Área livre mínima: em telas minúsculas os painéis cedem para o mundo continuar utilizável. */
@@ -44,6 +46,8 @@ export interface PanelGeometry {
   feedOpenH: number;
   feedClosedH: number;
   feedMargin: number;
+  /** Altura do seletor de andar (com folga) quando ele está visível, abaixo da barra superior; 0 sem andares. */
+  floorsH?: number;
 }
 
 export interface PanelFlags {
@@ -64,7 +68,7 @@ function shrinkPair(a: number, b: number, total: number): [number, number] {
 
 /** Margens cobertas pela UI (puro: testado em viewport.test.ts). */
 export function computeInsets(g: PanelGeometry, f: PanelFlags, gap = INSET_GAP): ViewInsets {
-  const top = Math.max(0, g.topBottom) + gap;
+  const top = Math.max(0, g.topBottom) + Math.max(0, g.floorsH ?? 0) + gap;
   const left = f.sidebar && !f.narrow ? Math.max(0, g.sideRight) + gap : 0;
   const right = f.drawer && !g.drawerSheet ? Math.max(0, g.vw - g.drawerLeft) + gap : 0;
   const feedH = f.feed ? g.feedOpenH : g.feedClosedH;
@@ -89,6 +93,8 @@ export interface FreeAreaPanels {
   sidebar: HTMLElement;
   drawer: HTMLElement;
   feed: HTMLElement;
+  /** Seletor de andar (opcional): quando visível, o enquadramento do prédio desce para não ficar sob ele. */
+  floors?: HTMLElement;
 }
 
 /** `follow: 'option'` segue a opção "seguir selecionado" do momento; `true` = duplo clique (sempre segue). */
@@ -145,6 +151,7 @@ export class FreeArea {
       ro.observe(this.probeGap);
       ro.observe(panels.sidebar);
       ro.observe(panels.drawer);
+      if (panels.floors) ro.observe(panels.floors);
     }
     this.watchCanvas();
   }
@@ -179,6 +186,8 @@ export class FreeArea {
     }
     const f = this.flags();
     const g = this.measure();
+    // O seletor de andar fica logo abaixo da barra superior (não depende dos insets, que o incluem: sem laço).
+    this.panels.root.style.setProperty('--topbar-bottom', `${g.topBottom}px`);
     const insets = computeInsets(g, { ...f, drawer: f.drawer && !this.guarding });
     this.placeToasts(insets, g);
     if (sameInsets(this.applied, insets)) return;
@@ -345,7 +354,10 @@ export class FreeArea {
     const vw = innerWidth;
     const vh = innerHeight;
     const drawerSheet = drawer.offsetWidth >= vw - 40 && drawer.offsetTop > topbar.offsetHeight + 40;
+    // offsetHeight é 0 com o seletor escondido (display:none), então a folga só entra quando ele aparece.
+    const floorsH = this.panels.floors?.offsetHeight ? this.panels.floors.offsetHeight + FLOORS_GAP : 0;
     return {
+      floorsH,
       vw,
       vh,
       topBottom: topbar.offsetTop + topbar.offsetHeight,

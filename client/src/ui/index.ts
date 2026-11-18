@@ -296,7 +296,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
 
   root.classList.add('ui-root');
   root.append(timelapse.vignette, topbar.el, sidebar.el, scrim, feed.el, drawer.el, terminal.el, pty.el, timelapse.el, timelapse.badge, toasts.el, banner.el, floorBar.el, update.el, empty.el, popups.el, tip.el, settings.el, worldDialog.el, history.el, deliveries.el, help.el, renamer.el, live, splash.el);
-  area = new FreeArea(world, { root, topbar: topbar.el, sidebar: sidebar.el, drawer: drawer.el, feed: feed.el }, () => ({
+  area = new FreeArea(world, { root, topbar: topbar.el, sidebar: sidebar.el, drawer: drawer.el, feed: feed.el, floors: floorBar.el }, () => ({
     sidebar: panels.sidebar,
     feed: panels.feed,
     drawer: selection !== null && !drawer.floating,
