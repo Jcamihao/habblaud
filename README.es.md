@@ -151,11 +151,11 @@ dejan de valer, y la línea de tiempo del timelapse del día mezcla ids antiguos
 
 **Equipos por el nombre de la sesión.** Una sesión llamada `Trampo do Triluga` va a la sala del proyecto `Triluga`, en el piso de la gerencia que tiene esa carpeta. La regla:
 
-- El prefijo `Trampo do/da/dos/das` es opcional. Mayúsculas, acentos, espacios y puntuación no cuentan (`Hora H` es igual a `HoraH`).
-- El nombre tiene que ser igual al de la carpeta, o empezar con al menos 4 letras de ella, y solo vale si una única carpeta coincide.
-- Si coincide con carpetas de gerencias distintas, la sesión no cambia. Sin coincidencia, se queda en la sala de la carpeta donde se abrió.
+- El prefijo `Trampo do/da/de/dos/das` es opcional. Mayúsculas, acentos, espacios y puntuación no cuentan (`Hora H` es igual a `HoraH`).
+- El nombre de la sesión tiene que ser igual al de la carpeta o ser el comienzo de él (al menos 4 letras, como `Trilu` para `Triluga`), y solo vale si una única carpeta coincide.
+- Si coincide con más de una carpeta, la sesión no cambia. Sin coincidencia, se queda en la sala de la carpeta donde se abrió.
 
-En Docker, una carpeta de proyecto nueva exige ejecutar `npm run docker:up` de nuevo.
+En Docker, `npm run docker:up` pasa las carpetas de cada gerencia al contenedor, y una carpeta de proyecto nueva exige ejecutarlo de nuevo. Fuera de Docker, el servidor lee las carpetas al iniciar.
 
 ## Instalación
 

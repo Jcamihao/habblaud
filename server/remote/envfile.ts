@@ -24,11 +24,20 @@ export function updateEnv(content: string, set: Record<string, string | null>): 
   return out.length ? `${out.join('\n')}\n` : '';
 }
 
-/** Valor de uma chave do .env (a primeira ocorrência), sem aspas. */
+/**
+ * Valor de uma chave do .env (a primeira ocorrência), no modo do Docker Compose: com aspas, vale o que está entre
+ * elas (o que vem depois, como ` # nota`, é comentário); sem aspas, comentário só começa em espaço + `#`
+ * (`a#b` fica inteiro). Não interpreta escapes (`\n`) nem `${VAR}`. Aspa sem fechar: o texto todo, como antes.
+ */
 export function readEnvValue(content: string, key: string): string | undefined {
   for (const line of content.split(/\r?\n/)) {
     const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/.exec(line);
-    if (m?.[1] === key) return m[2].trim().replace(/^(['"])(.*)\1$/, '$2');
+    if (m?.[1] !== key) continue;
+    if (/^\s+#/.test(m[2])) return '';
+    const value = m[2].trim();
+    const quoted = /^'([^']*)'/.exec(value) ?? /^"((?:[^"\\]|\\.)*)"/.exec(value);
+    if (quoted) return quoted[1];
+    return value.replace(/\s+#.*$/, '');
   }
   return undefined;
 }

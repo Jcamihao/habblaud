@@ -154,11 +154,11 @@ enregistrés avant cessent de s'appliquer, et la chronologie du timelapse du jou
 
 **Équipes par nom de session.** Une session nommée `Trampo do Triluga` rejoint la salle du projet `Triluga`, sur l'étage de la direction qui contient ce dossier. La règle :
 
-- Le préfixe `Trampo do/da/dos/das` est facultatif. Majuscules, accents, espaces et ponctuation ne comptent pas (`Hora H` équivaut à `HoraH`).
-- Le nom doit être identique à celui du dossier, ou commencer par au moins 4 lettres de celui-ci, et seulement si un seul dossier correspond.
-- S'il correspond à des dossiers de directions différentes, la session ne bouge pas. Sans correspondance, elle reste dans la salle du dossier où elle a été ouverte.
+- Le préfixe `Trampo do/da/de/dos/das` est facultatif. Majuscules, accents, espaces et ponctuation ne comptent pas (`Hora H` équivaut à `HoraH`).
+- Le nom de la session doit être identique à celui du dossier ou en être le début (au moins 4 lettres, comme `Trilu` pour `Triluga`), et seulement si un seul dossier correspond.
+- S'il correspond à plus d'un dossier, la session ne bouge pas. Sans correspondance, elle reste dans la salle du dossier où elle a été ouverte.
 
-Sous Docker, un nouveau dossier de projet exige de relancer `npm run docker:up`.
+Sous Docker, `npm run docker:up` transmet au conteneur les dossiers de chaque direction, et un nouveau dossier de projet exige de le relancer. Hors Docker, le serveur lit les dossiers au démarrage.
 
 ## Installation
 

@@ -2037,8 +2037,8 @@ export const EN: Readonly<Record<string, string>> = {
   // scripts/docker-up.ts
   "Uso: npm run docker:up [-- opções]\n\nOpções:\n  --no-build   sobe sem reconstruir a imagem\n  --down       derruba o container (o mesmo que npm run docker:down)\n  -h, --help   mostra esta ajuda\n\nVariáveis: HABBLAUD_PORT (porta no host, padrão {0}), HABBLAUD_CLAUDE_DIRS\n(config dirs separados por vírgula, se as contas não estiverem em ~/.claude*), HABBLAUD_CODEX_DIRS\n(pastas do Codex, se não estiverem em ~/.codex* nem em CODEX_HOME), HABBLAUD_CODEX=0 (sem o Codex)\ne HABBLAUD_FLOORS (gerências, do ambiente ou do .env: as pastas de cada uma vão para o container).": "Usage: npm run docker:up [-- options]\n\nOptions:\n  --no-build   starts without rebuilding the image\n  --down       stops the container (same as npm run docker:down)\n  -h, --help   shows this help\n\nVariables: HABBLAUD_PORT (host port, default {0}), HABBLAUD_CLAUDE_DIRS\n(comma-separated config dirs, if the accounts aren't in ~/.claude*), HABBLAUD_CODEX_DIRS\n(Codex folders, if they aren't in ~/.codex* or CODEX_HOME), HABBLAUD_CODEX=0 (without Codex)\nand HABBLAUD_FLOORS (floors, from the environment or .env: each one's folders go to the container).",
   "Equipes por nome de sessão: {0} e {1} vão para o container. Projeto novo: rode o npm run docker:up de novo.": "Teams by session name: {0} and {1} go to the container. New project: run npm run docker:up again.",
-  "gerência": "department",
-  "gerências": "departments",
+  "gerência": "group",
+  "gerências": "groups",
   "pasta de projeto": "project folder",
   "pastas de projeto": "project folders",
   "[docker-up] Atenção: {0}": "[docker-up] Warning: {0}",
