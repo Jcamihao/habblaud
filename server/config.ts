@@ -1,5 +1,5 @@
 // Configuração do servidor a partir das variáveis de ambiente (documentadas em server/README.md).
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -8,6 +8,7 @@ import { discoverClaudeDirs } from './accounts/detect';
 import { parseAllowedHosts } from './http/guard';
 import { parseRemoteConfig, type RemoteConfig } from './http/remote';
 import { parseFloors } from './model/floors';
+import { normalizeCwd } from './model/rooms';
 import { parseGithubRepo } from './updates/checker';
 import { tr } from '../shared/i18n';
 
@@ -63,6 +64,11 @@ export interface ServerConfig {
   floors: string[];
   /** Entradas de HABBLAUD_FLOORS descartadas (relativas, `/`, vazias ou repetidas), para o log ao iniciar. */
   floorWarnings: string[];
+  /**
+   * Pastas filhas de cada andar (andar -> nomes): HABBLAUD_FLOOR_PROJECTS (JSON), ou, sem ela, o que há no disco
+   * (scanFloorProjects). É daqui que sai a sala de equipe pelo nome da sessão (model/floors.ts matchTeam).
+   */
+  floorProjects: Record<string, string[]>;
 }
 
 export interface WorldConfig {
@@ -227,6 +233,58 @@ export function worldSocketUrl(base: string): string {
   return `${base.replace(/^http/, 'ws').replace(/\/+$/, '')}/v1/socket`;
 }
 
+/**
+ * HABBLAUD_FLOOR_PROJECTS: JSON `{"<andar>": ["<pasta>", ...]}`. Ausente, vazia ou inválida = {} (nunca lança);
+ * valores que não são lista de nomes não entram.
+ */
+export function parseFloorProjects(raw: string | undefined): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  if (!raw?.trim()) return out;
+  let j: unknown;
+  try {
+    j = JSON.parse(raw);
+  } catch {
+    return out;
+  }
+  if (!j || typeof j !== 'object' || Array.isArray(j)) return out;
+  for (const [floor, list] of Object.entries(j as Record<string, unknown>)) {
+    if (!Array.isArray(list)) continue;
+    const names = list.filter((n): n is string => typeof n === 'string' && n.trim() !== '');
+    out[normalizeCwd(floor)] = names;
+  }
+  return out;
+}
+
+/** Link simbólico que aponta para uma pasta (link quebrado ou para arquivo: não). */
+function isDirectoryLink(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pastas filhas diretas de cada andar, do disco: só diretórios (inclusive link para pasta), sem nome que começa com '.', em ordem localeCompare.
+ * Andar inexistente ou ilegível = lista vazia (nunca lança).
+ */
+export function scanFloorProjects(floors: readonly string[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const floor of floors) {
+    let names: string[] = [];
+    try {
+      names = readdirSync(floor, { withFileTypes: true })
+        .filter((d) => !d.name.startsWith('.') && (d.isDirectory() || (d.isSymbolicLink() && isDirectoryLink(join(floor, d.name)))))
+        .map((d) => d.name)
+        .sort((a, b) => a.localeCompare(b));
+    } catch {
+      names = [];
+    }
+    out[floor] = names;
+  }
+  return out;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] = process.argv): ServerConfig {
   const home = env.HOME || homedir();
   const inDocker = detectDocker(env);
@@ -236,6 +294,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
   const pkg = readPackage(rootDir);
   const remote = parseRemoteConfig(env, inDocker);
   const floors = parseFloors(env.HABBLAUD_FLOORS);
+  const floorProjects = env.HABBLAUD_FLOOR_PROJECTS?.trim()
+    ? parseFloorProjects(env.HABBLAUD_FLOOR_PROJECTS)
+    : scanFloorProjects(floors.floors);
   return {
     port: Number.isFinite(port) && port > 0 && port < 65536 ? port : 4747,
     host,
@@ -260,5 +321,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     world: parseWorldConfig(env, argv),
     floors: floors.floors,
     floorWarnings: floors.warnings,
+    floorProjects,
   };
 }

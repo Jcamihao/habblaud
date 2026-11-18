@@ -118,6 +118,7 @@ const office = new Office({
   names,
   roomAlias: (path) => roomAliases.get(path),
   floors: config.floors,
+  floorProjects: config.floorProjects,
   version: config.version,
   // No modo dev o Vite serve o cliente direto do código-fonte: não há build para comparar.
   build: config.dev ? undefined : createBuildReader(config.rootDir),

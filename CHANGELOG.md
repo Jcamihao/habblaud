@@ -18,6 +18,7 @@ do meio (0.**3**.0).
   Salas fora de gerência ficam no térreo. Sem a variável, nada muda.
 - Limite conhecido: no timelapse os andares aparecem em ordem alfabética. Se o andar escolhido não existir num instante
   do replay, a vista cai no primeiro andar e não volta sozinha.
+- **Equipes pelo nome da sessão.** Sessão chamada "Trampo do Triluga" vai para a sala do projeto Triluga, no andar da gerência que tem essa pasta. O prefixo "Trampo do/da/de/dos/das" é opcional; maiúsculas, acentos, espaços e pontuação não contam. Vale igualdade exata, ou o nome da sessão ser o começo do nome da pasta (4+ letras); só vale se uma única pasta casar. Se casar com mais de uma, a sessão não se move; sem casar, fica na sala da pasta onde foi aberta. No Docker, `npm run docker:up` repassa as pastas de cada gerência: projeto novo exige rodar de novo. Fora do Docker, o servidor lê as pastas ao iniciar.
 
 ### Alterado
 

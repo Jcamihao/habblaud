@@ -48,6 +48,17 @@ describe('.env', () => {
     expect(readEnvValue('X="a b"\n', 'X')).toBe('a b');
     expect(addToList('a.lan, b', 'b', 'c.local')).toBe('a.lan,b,c.local');
   });
+  it('readEnvValue segue o Compose nos comentários: sem aspas só após espaço + #; com aspas vale o que está dentro', () => {
+    expect(readEnvValue('X=/a # nota\n', 'X')).toBe('/a');
+    expect(readEnvValue('X=/a\t# nota\n', 'X')).toBe('/a');
+    expect(readEnvValue('X=/a#b\n', 'X')).toBe('/a#b');
+    expect(readEnvValue('X= # nada\n', 'X')).toBe('');
+    expect(readEnvValue('X="/a # b" # nota\n', 'X')).toBe('/a # b');
+    expect(readEnvValue("X='/a b'# nota\n", 'X')).toBe('/a b');
+    expect(readEnvValue('X="a\\"b" # nota\n', 'X')).toBe('a\\"b');
+    expect(readEnvValue('X="sem fechar # a\n', 'X')).toBe('"sem fechar');
+    expect(readEnvValue('X=\n', 'X')).toBe('');
+  });
   it('remoteEnv do setup: hash no lugar da senha, nomes liberados no Host, bind aberto', () => {
     const env = remoteEnv('HABBLAUD_REMOTE_PASSWORD=velha\nHABBLAUD_ALLOWED_HOSTS=casa.lan\n', {
       user: 'ana',

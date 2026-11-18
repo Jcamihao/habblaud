@@ -1,7 +1,12 @@
 // Funções puras de scripts/docker-up.ts (importar o módulo não sobe nada).
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { DetectedAccount } from '../accounts/detect';
+import { parseFloorProjects } from '../config';
 import { legacyEnvWarning } from '../legacy';
+import { parseFloors } from '../model/floors';
 import {
   accountsPayload,
   CODEX_MOUNTED_SUBDIRS,
@@ -10,6 +15,7 @@ import {
   copyVolumeArgs,
   type DockerState,
   envFileKeys,
+  floorProjectsEnv,
   hostTimeZone,
   parseArgs,
   planCodexMounts,
@@ -222,5 +228,115 @@ describe('docker-up: migração do nome antigo (CodeTown)', () => {
     expect(msg).toBe('variáveis do nome antigo ignoradas no .env: CODETOWN_BIND → HABBLAUD_BIND, CODETOWN_PORT → HABBLAUD_PORT. Renomeie para valer de novo.');
     expect(msg).not.toContain('0.0.0.0');
     expect(envFileKeys('')).toEqual([]);
+  });
+});
+
+describe('floorProjectsEnv (HABBLAUD_FLOOR_PROJECTS do override)', () => {
+  const fakeScan = (map: Record<string, string[]>) => (floors: readonly string[]) =>
+    Object.fromEntries(floors.map((f) => [f, map[f] ?? []]));
+
+  it('lê HABBLAUD_FLOORS do ambiente e repassa as pastas filhas de cada gerência como JSON', () => {
+    const scan = fakeScan({ '/c/g': ['Agilis', 'Triluga'], '/c/h': [] });
+    expect(floorProjectsEnv({ HABBLAUD_FLOORS: '/c/g, /c/h' }, undefined, scan)).toBe('{"/c/g":["Agilis","Triluga"],"/c/h":[]}');
+  });
+
+  it('sem o ambiente, lê HABBLAUD_FLOORS do texto do .env (aspas, export, comentários e linhas vazias)', () => {
+    const calls: string[][] = [];
+    const scan = (floors: readonly string[]) => {
+      calls.push([...floors]);
+      return Object.fromEntries(floors.map((f) => [f, ['P']]));
+    };
+    const envFile = '# gerências do dono\n\nOUTRA=1\nexport HABBLAUD_FLOORS="/c/g, /c/h"\n# HABBLAUD_FLOORS=/c/x\n';
+    expect(floorProjectsEnv({}, envFile, scan)).toBe('{"/c/g":["P"],"/c/h":["P"]}');
+    expect(calls).toEqual([['/c/g', '/c/h']]);
+    expect(floorProjectsEnv({}, "HABBLAUD_FLOORS='/c/g'\n", scan)).toBe('{"/c/g":["P"]}');
+  });
+
+  it('o ambiente vale mais que o .env (como no Compose)', () => {
+    const calls: string[][] = [];
+    const scan = (floors: readonly string[]) => {
+      calls.push([...floors]);
+      return {};
+    };
+    floorProjectsEnv({ HABBLAUD_FLOORS: '/c/x' }, 'HABBLAUD_FLOORS=/c/g', scan);
+    expect(calls).toEqual([['/c/x']]);
+    // Variável vazia no ambiente também vale: sem gerência, nada é gerado.
+    expect(floorProjectsEnv({ HABBLAUD_FLOORS: '' }, 'HABBLAUD_FLOORS=/c/g', scan)).toBeUndefined();
+  });
+
+  it('sem HABBLAUD_FLOORS em lugar nenhum devolve undefined e não varre pastas', () => {
+    const calls: string[][] = [];
+    const scan = (floors: readonly string[]) => {
+      calls.push([...floors]);
+      return {};
+    };
+    expect(floorProjectsEnv({}, undefined, scan)).toBeUndefined();
+    expect(floorProjectsEnv({ OUTRA: '/c/g' }, 'OUTRA=/c/g\n', scan)).toBeUndefined();
+    expect(floorProjectsEnv({ HABBLAUD_FLOORS: '  ' }, undefined, scan)).toBeUndefined();
+    expect(calls).toEqual([]);
+  });
+
+  it('descarta entradas inválidas (relativas, "/" e repetidas) como o servidor', () => {
+    const calls: string[][] = [];
+    const scan = (floors: readonly string[]) => {
+      calls.push([...floors]);
+      return {};
+    };
+    floorProjectsEnv({ HABBLAUD_FLOORS: 'relativo,/,/c/g,/c/g/' }, undefined, scan);
+    expect(calls).toEqual([['/c/g']]);
+  });
+
+  it('gerência inexistente ou ilegível vira lista vazia, sem falhar', () => {
+    expect(floorProjectsEnv({ HABBLAUD_FLOORS: '/nao/existe' }, undefined, () => {
+      throw new Error('EACCES');
+    })).toBe('{"/nao/existe":[]}');
+  });
+
+  it('renderOverride repassa HABBLAUD_FLOOR_PROJECTS só quando há o JSON', () => {
+    const mounts = planMounts(['/Users/fulano/.claude'], [acc('.claude')], (p) => p);
+    const json = '{"/c/g":["Triluga"]}';
+    expect(renderOverride(mounts, new Date(0), undefined, undefined, [], undefined, [], json)).toContain(`HABBLAUD_FLOOR_PROJECTS: ${JSON.stringify(json)}`);
+    expect(renderOverride(mounts)).not.toContain('HABBLAUD_FLOOR_PROJECTS');
+  });
+  it('o .env aceita comentário na mesma linha, como o Compose', () => {
+    const scan = (floors: readonly string[]) => Object.fromEntries(floors.map((f) => [f, ['P']]));
+    expect(floorProjectsEnv({}, 'HABBLAUD_FLOORS=/c/g # minhas gerências\n', scan)).toBe('{"/c/g":["P"]}');
+    expect(floorProjectsEnv({}, 'HABBLAUD_FLOORS="/c/g, /c/h" # nota\n', scan)).toBe('{"/c/g":["P"],"/c/h":["P"]}');
+  });
+
+  it('ida e volta: o JSON passa por parseFloorProjects e dá o mesmo mapa, com as chaves de config.floors', () => {
+    const base = mkdtempSync(join(tmpdir(), 'habblaud-floors-'));
+    try {
+      const g = join(base, 'Gerência A');
+      const h = join(base, 'praxis.');
+      for (const d of ['Agilis', 'Hora H', 'Ação "x"', 'a$b', 'c\\d', '.oculta']) mkdirSync(join(g, d), { recursive: true });
+      mkdirSync(h, { recursive: true });
+      const raw = ` ${g}/ , ${h} ,relativo`;
+      const json = floorProjectsEnv({ HABBLAUD_FLOORS: raw }, undefined);
+      const { floors } = parseFloors(raw);
+      const back = parseFloorProjects(json);
+      expect(Object.keys(back)).toEqual(floors);
+      expect(back[g]).toEqual(['a$b', 'Ação "x"', 'Agilis', 'c\\d', 'Hora H']);
+      expect(back[h]).toEqual([]);
+      // o override entrega o JSON ao Compose sem perder nada: aspas e barra escapadas, `$` dobrado (o Compose desfaz).
+      const mounts = planMounts(['/Users/fulano/.claude'], [acc('.claude')], (p) => p);
+      const yaml = renderOverride(mounts, new Date(0), undefined, undefined, [], undefined, [], json);
+      const line = yaml.split('\n').find((l) => l.includes('HABBLAUD_FLOOR_PROJECTS'));
+      expect(line).toBe(`      HABBLAUD_FLOOR_PROJECTS: ${yamlString(json!)}`);
+      expect(line).toContain('a$$b');
+      expect(line).not.toMatch(/[^$]\$[^$]/);
+      const yamlValue = JSON.parse(line!.slice(line!.indexOf(': ') + 2).replaceAll('$$', '$')) as string;
+      expect(yamlValue).toBe(json);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('sem gerência o override é o mesmo de antes (nenhuma linha nova)', () => {
+    const mounts = planMounts(['/Users/fulano/.claude'], [acc('.claude')], (p) => p);
+    const a = renderOverride(mounts, new Date(0), '/u', 'America/Sao_Paulo');
+    expect(renderOverride(mounts, new Date(0), '/u', 'America/Sao_Paulo', [], undefined, [], undefined)).toBe(a);
+    expect(renderOverride(mounts, new Date(0), '/u', 'America/Sao_Paulo', [], undefined, [], '')).toBe(a);
+    expect(floorProjectsEnv({}, '')).toBeUndefined();
   });
 });

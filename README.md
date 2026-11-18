@@ -147,6 +147,14 @@ applying, and the day's timelapse mixes old and new ids.
 
 **In Docker**, the value goes in `.env`, with the host's paths. Run `npm run docker:up` again to apply it.
 
+**Teams by session name.** A session named `Trampo do Triluga` goes to the room of the project `Triluga`, on the floor of the group that has that folder. The rule:
+
+- The `Trampo do/da/de/dos/das` prefix is optional. Case, accents, spaces and punctuation don't count (`Hora H` is the same as `HoraH`).
+- The session name must equal the folder's name or be the beginning of it (at least 4 letters, like `Trilu` for `Triluga`), and only applies when a single folder matches.
+- If it matches more than one folder, the session doesn't move. With no match, it stays in the room of the folder where it was opened.
+
+In Docker, `npm run docker:up` passes each group's folders to the container, and a new project folder needs it run again. Outside Docker, the server reads the folders at startup.
+
 ## Installation
 
 ### Requirements
